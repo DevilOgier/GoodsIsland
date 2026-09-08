@@ -52,11 +52,18 @@ for (const [key, name, color] of [
   ['retro', '复古票根', '#eee3cf'],
   ['minimal', '极简留白', '#f1f1f1'],
 ]) {
-  await db.posterTemplate.upsert({
-    where: { key_version: { key, version: 1 } },
-    update: {},
-    create: { key, name, rendererKey: key, defaultConfig: { background: color } },
-  });
+  for (const version of [1, 2])
+    await db.posterTemplate.upsert({
+      where: { key_version: { key, version } },
+      update: {},
+      create: {
+        key,
+        version,
+        name,
+        rendererKey: key,
+        defaultConfig: { background: color, layoutVersion: version },
+      },
+    });
 }
 console.log('示例图鉴和海报模板已初始化；未创建账号或虚构个人库存。');
 await db.$disconnect();

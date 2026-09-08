@@ -116,7 +116,10 @@ try {
   )
     throw Error('Failure damaged previous images');
   await page.goto('http://localhost:3000/posters');
-  await page.getByLabel('添加海报商品').selectOption(fixtureProduct.id);
+  await page.getByRole('button',{name:'从系列图鉴添加'}).click();
+  await page.getByLabel('搜索系列或商品').fill('浏览器验证商品');
+  await page.locator('.series-tile').click();
+  await page.locator('.picker-product').click();
   await page.getByAltText('海报实时预览').waitFor();
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: '导出 PNG' }).click();

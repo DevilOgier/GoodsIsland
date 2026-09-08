@@ -34,9 +34,8 @@ export const feeSchema = z.object({
   reason: z.string().min(1, '请填写补费原因').max(500),
 });
 export const productSchema = z.object({
-  name: z.string().min(1).max(100),
   seriesId: uuid,
-  productType: z.enum(['BADGE', 'STANDEE', 'POSTCARD', 'BONUS', 'KEYCHAIN', 'PLUSH', 'OTHER']),
+  productType: z.string().min(1).max(100),
   appearanceKey: z.string().min(1).max(100).default('default'),
   description: z.string().max(2000).default(''),
   tagIds: z.array(uuid).max(20).default([]),

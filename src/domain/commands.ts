@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { db } from '@/infrastructure/db';
@@ -192,11 +192,28 @@ async function dispatch(
   }
   if (op.startsWith('catalog.')) {
     ensure(user.role === 'ADMIN', '仅管理员可维护公共图鉴', 403);
+    if (op === 'catalog.type') {
+      const d = z.object({ name: z.string().trim().min(1).max(30) }).parse(raw);
+      return tx.productType.create({ data: { key: 'CUSTOM_' + randomUUID(), name: d.name } });
+    }
+    async function nameFor(seriesId: string, productType: string) {
+      const series = await tx.series.findUnique({
+        where: { id: seriesId },
+        include: { character: true },
+      });
+      const type = await tx.productType.findUnique({ where: { key: productType } });
+      ensure(series && type && type.status === 'ACTIVE', '请选择有效系列与类型');
+      return series.character.name + ' · ' + series.name + ' · ' + type.name;
+    }
     if (op === 'catalog.product') {
       const d = productSchema.parse(raw);
       const { tagIds, ...data } = d;
       return tx.product.create({
-        data: { ...data, tags: { create: tagIds.map((tagId) => ({ tagId })) } },
+        data: {
+          ...data,
+          name: await nameFor(data.seriesId, data.productType),
+          tags: { create: tagIds.map((tagId) => ({ tagId })) },
+        },
       });
     }
     if (op === 'catalog.product-update') {
@@ -206,6 +223,7 @@ async function dispatch(
         where: { id },
         data: {
           ...rest,
+          name: await nameFor(rest.seriesId, rest.productType),
           ...(tagIds.length
             ? { tags: { deleteMany: {}, create: tagIds.map((tagId) => ({ tagId })) } }
             : {}),

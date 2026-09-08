@@ -13,6 +13,7 @@ export async function POST(request: Request) {
         type: z.enum(['SALE', 'WANTED']),
         ratio: z.enum(['1:1', '4:3', '3:4', '16:9', '9:16']),
         template: z.enum(['cute', 'simple', 'retro', 'minimal']),
+        templateVersion: z.number().int().min(1).max(2).default(2),
         items: z
           .array(
             z.object({
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     const result = await db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${user.id},0))`;
       const template = await tx.posterTemplate.findUniqueOrThrow({
-        where: { key_version: { key: d.template, version: 1 } },
+        where: { key_version: { key: d.template, version: d.templateVersion } },
       });
       ensure(
         new Set(d.items.map((i) => i.productId)).size === d.items.length,

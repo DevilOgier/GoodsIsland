@@ -1,6 +1,9 @@
 'use client';
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Images } from 'lucide-react';
+import ProductPicker from './product-picker';
+import ProductArt from './product-art';
+import ProductEditor from './product-editor';
 import type { Snapshot } from './types';
 import { typeNames } from './types';
 export type Dialog = { type: string; id?: string; productId?: string; wantedId?: string };
@@ -18,14 +21,29 @@ export default function ActionForm({
   data,
   onClose,
   onSave,
+  onRefresh,
 }: {
   dialog: Dialog;
   data: Snapshot;
   onClose: () => void;
-  onSave: (op: string, payload: Record<string, unknown>) => Promise<void>;
+  onSave: (op: string, payload: Record<string, unknown>) => Promise<unknown>;
+  onRefresh: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [pickedId, setPickedId] = useState(dialog.productId ?? '');
+  const [picking, setPicking] = useState(false);
+  const picked = data.products.find((p) => p.id === pickedId);
+  if (['product', 'productEdit'].includes(dialog.type))
+    return (
+      <ProductEditor
+        data={data}
+        id={dialog.type === 'productEdit' ? dialog.id : undefined}
+        onSave={onSave}
+        onClose={onClose}
+        onRefresh={onRefresh}
+      />
+    );
   const productOptions = data.products
     .filter((p) => p.status === 'ACTIVE')
     .map((p) => [p.id, p.name] as [string, string]);
@@ -82,6 +100,11 @@ export default function ActionForm({
         })),
         notes,
       ];
+      break;
+    case 'productType':
+      title = '新增谷子类型';
+      op = 'catalog.type';
+      fields = [{ name: 'name', label: '类型名称（例如：色纸、拍立得）' }];
       break;
     case 'fees':
       title = '追加运费 / 其他费用';
@@ -252,6 +275,8 @@ export default function ActionForm({
               if (item) payload.groupBuyItemId = item.id;
             }
             try {
+              if (fields.some((f) => f.name === 'productId') && !pickedId)
+                throw Error('请先从系列图鉴选择谷子');
               await onSave(op, payload);
               onClose();
             } catch (e) {
@@ -262,41 +287,69 @@ export default function ActionForm({
           }}
         >
           <div className="form-grid">
-            {fields.map((f) => (
-              <label key={f.name}>
-                {f.label}
-                {f.options ? (
-                  <select
-                    name={f.name}
-                    defaultValue={f.value ?? f.options[0]?.[0]}
-                    required={f.required !== false}
+            {fields.map((f) =>
+              f.name === 'productId' ? (
+                <div className="chosen-product" key={f.name}>
+                  <span>选择谷子</span>
+                  <input type="hidden" name="productId" value={pickedId} />
+                  <button
+                    type="button"
+                    aria-label="从系列图鉴选择谷子"
+                    disabled={!!dialog.id && ['sale', 'purchase'].includes(dialog.type)}
+                    onClick={() => setPicking(true)}
                   >
-                    {f.options.map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    autoFocus={f === fields[0]}
-                    name={f.name}
-                    type={f.kind ?? 'text'}
-                    defaultValue={f.value ?? ''}
-                    step={
-                      f.kind === 'number'
-                        ? f.name.includes('Quantity') || f.name === 'quantity'
-                          ? '1'
-                          : '0.01'
-                        : undefined
-                    }
-                    min={f.min}
-                    required={f.required !== false}
-                    maxLength={f.kind ? undefined : 2000}
-                  />
-                )}
-              </label>
-            ))}
+                    {picked ? (
+                      <>
+                        <ProductArt product={picked} />
+                        <span>
+                          <strong>{picked.name}</strong>
+                          <small>点击更换系列 / 类型</small>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Images />
+                        <span>浏览系列图鉴，选择买到的谷子</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <label key={f.name}>
+                  {f.label}
+                  {f.options ? (
+                    <select
+                      name={f.name}
+                      defaultValue={f.value ?? f.options[0]?.[0]}
+                      required={f.required !== false}
+                    >
+                      {f.options.map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      autoFocus={f === fields[0]}
+                      name={f.name}
+                      type={f.kind ?? 'text'}
+                      defaultValue={f.value ?? ''}
+                      step={
+                        f.kind === 'number'
+                          ? f.name.includes('Quantity') || f.name === 'quantity'
+                            ? '1'
+                            : '0.01'
+                          : undefined
+                      }
+                      min={f.min}
+                      required={f.required !== false}
+                      maxLength={f.kind ? undefined : 2000}
+                    />
+                  )}
+                </label>
+              ),
+            )}
           </div>
           {dialog.wantedId && (
             <label className="check-row">
@@ -319,6 +372,22 @@ export default function ActionForm({
           </footer>
         </form>
       </section>
+      {picking && (
+        <ProductPicker
+          data={data}
+          selectedId={pickedId}
+          allowedIds={
+            ['sale', 'listing'].includes(dialog.type)
+              ? data.inventory.filter((i) => i.currentQuantity > 0).map((i) => i.productId)
+              : undefined
+          }
+          onClose={() => setPicking(false)}
+          onSelect={(p) => {
+            setPickedId(p.id);
+            setPicking(false);
+          }}
+        />
+      )}
     </div>
   );
 }

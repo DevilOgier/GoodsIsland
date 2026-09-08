@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Flower2,
   LayoutDashboard,
@@ -28,11 +28,12 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
-import { price, typeNames, statusNames } from './types';
+import { price, statusNames } from './types';
 import ProductArt from './product-art';
 import ActionForm from './action-form';
 import type { Dialog } from './action-form';
 import PosterEditor from './poster-editor';
+import CollectionGallery from './collection-gallery';
 const nav = [
   ['/', '我的小岛', LayoutDashboard],
   ['/products', '谷子图鉴', BookOpen],
@@ -48,6 +49,7 @@ const nav = [
 export default function Cabinet({ user }: { user: { name: string; role: string } }) {
   const router = useRouter();
   const path = usePathname();
+  const searchParams = useSearchParams();
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -59,7 +61,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
   const [series, setSeries] = useState('');
   const [tag, setTag] = useState('');
   const [type, setType] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [page, setPage] = useState(1);
   const [imageBusy, setImageBusy] = useState(false);
   const load = useCallback(async () => {
@@ -103,6 +105,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
     if (!r.ok) throw Error(j.error);
     await load();
     notify('已保存，收藏柜已更新');
+    return j;
   };
   const act = async (op: string, payload: Record<string, unknown>) => {
     try {
@@ -207,7 +210,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                   {p.name}
                 </Link>
                 <div className="card-bottom">
-                  <span className="type-tag">{typeNames[p.productType]}</span>
+                  <span className="type-tag">{p.typeDefinition.name}</span>
                   <span className="stock">
                     {inv?.currentQuantity ?? 0}
                     <small> 件在手</small>
@@ -257,62 +260,62 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
     </Link>
   );
   function purchasesList(items: Snapshot['purchases']) {
-    return items.length ? (
-      <div className="record-list">
-        {items.map((p) => (
-          <article className="record" key={p.id}>
-            {recordProduct(p.productId)}
-            <div>
-              <small>数量 / 商品金额</small>
-              <strong>
-                {p.quantity} 件 · {price(p.productAmount)}
-              </strong>
-            </div>
-            <div>
-              <small>实际成本</small>
-              <strong>{price(p.actualCost)}</strong>
-              <small>
-                {p.purchaseChannel} · {p.purchaseDate.slice(0, 10)}
-              </small>
-            </div>
-            <span className="pill">{statusNames[p.arrivalStatus]}</span>
-            <div className="record-actions">
-              {!['ARRIVED', 'CANCELLED'].includes(p.arrivalStatus) && (
-                <>
-                  <button
-                    className="small-btn"
-                    onClick={() => act('purchase.arrive', { id: p.id })}
-                  >
-                    确认到货
-                  </button>
-                  <button
-                    className="small-btn"
-                    onClick={() => act('purchase.status', { id: p.id, status: 'CANCELLED' })}
-                  >
-                    取消
-                  </button>
-                </>
-              )}
-              {p.arrivalStatus !== 'CANCELLED' && actionButton('fees', '补运费', p.id)}
-            </div>
-            <details className="record-details">
-              <summary>费用拆分与补费记录</summary>
-              <p>
-                初始国内运费 {price(p.domesticShipping)} · 国际运费 {price(p.internationalShipping)}{' '}
-                · 其他 {price(p.otherFee)}
-              </p>
-              {p.adjustments.map((a) => (
-                <p key={a.id}>
-                  {a.createdAt.slice(0, 10)} +{price(a.amount)} · {a.reason}
+    return (
+      <CollectionGallery
+        heading={status === 'IN_TRANSIT' ? '等待到货' : '买入记录'}
+        items={items
+          .filter((p) => productById(p.productId))
+          .map((p) => ({
+            id: p.id,
+            product: productById(p.productId)!,
+            badge: statusNames[p.arrivalStatus],
+            summary: (
+              <>
+                <strong>
+                  {p.quantity} 件 · 实际成本 {price(p.actualCost)}
+                </strong>
+                <small>
+                  {p.purchaseChannel} · {p.purchaseDate.slice(0, 10)}
+                </small>
+              </>
+            ),
+            actions: (
+              <>
+                {!['ARRIVED', 'CANCELLED'].includes(p.arrivalStatus) && (
+                  <>
+                    <button
+                      className="small-btn"
+                      onClick={() => act('purchase.arrive', { id: p.id })}
+                    >
+                      确认到货
+                    </button>
+                    <button
+                      className="small-btn"
+                      onClick={() => act('purchase.status', { id: p.id, status: 'CANCELLED' })}
+                    >
+                      取消
+                    </button>
+                  </>
+                )}
+                {p.arrivalStatus !== 'CANCELLED' && actionButton('fees', '补运费', p.id)}
+              </>
+            ),
+            details: (
+              <details className="record-details">
+                <summary>费用与补费记录</summary>
+                <p>
+                  商品金额 {price(p.productAmount)} · 国内运费 {price(p.domesticShipping)} ·
+                  国际运费 {price(p.internationalShipping)} · 其他 {price(p.otherFee)}
                 </p>
-              ))}
-              {p.notes && <p>{p.notes}</p>}
-            </details>
-          </article>
-        ))}
-      </div>
-    ) : (
-      empty('还没有买入记录', '记一笔买入', () => setDialog({ type: 'purchase' }))
+                {p.adjustments.map((a) => (
+                  <p key={a.id}>
+                    +{price(a.amount)} · {a.reason}
+                  </p>
+                ))}
+              </details>
+            ),
+          }))}
+      />
     );
   }
   function salesList(items: Snapshot['sales']) {
@@ -432,7 +435,19 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
             ].map(([Icon, label, value, unit], i) => {
               const I = Icon as typeof Archive;
               return (
-                <div className="stat" key={i}>
+                <Link
+                  className="stat stat-link"
+                  key={i}
+                  href={
+                    [
+                      '/inventory?status=stock',
+                      '/inventory?status=stock',
+                      '/purchases?status=IN_TRANSIT',
+                      '/wanted?status=ACTIVE',
+                    ][i]
+                  }
+                  aria-label={'查看' + String(label)}
+                >
                   <span className={'stat-icon tone-' + i}>
                     <I size={20} />
                   </span>
@@ -442,7 +457,8 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                       {String(value)} <span>{String(unit)}</span>
                     </strong>
                   </div>
-                </div>
+                  <ChevronRight className="stat-arrow" size={15} />
+                </Link>
               );
             })}
           </div>
@@ -495,6 +511,12 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
               </span>
             </Link>
           </div>
+          <div className="dashboard-poster-links">
+            <Link href="/wanted?status=ACTIVE">逛逛收物心愿 →</Link>
+            <Link href="/posters?source=wanted">生成我的收物图 →</Link>
+            <Link href="/listings?status=ACTIVE">查看正在出物 →</Link>
+            <Link href="/posters?source=listings">生成我的出物图 →</Link>
+          </div>
           <div className="summary-strip">
             待排发{' '}
             {
@@ -530,7 +552,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
               <h1>{selected.name}</h1>
               <p className="muted">
                 {selected.series.character.name} · {selected.series.name} ·{' '}
-                {typeNames[selected.productType]}
+                {selected.typeDefinition.name}
               </p>
               <p>{selected.description}</p>
               <div className="tag-row">
@@ -674,11 +696,44 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                 : '从角色到系列，让每一份喜欢都有迹可循。'}
             </p>
           </div>
-          {list.length
-            ? cards(list.slice((page - 1) * 12, page * 12), path === '/inventory')
-            : empty('这里还没有谷子', path === '/inventory' ? '记录买入' : '添加商品', () =>
-                setDialog({ type: path === '/inventory' ? 'purchase' : 'product' }),
-              )}
+          {list.length ? (
+            <CollectionGallery
+              heading={path === '/inventory' ? '我的收藏' : '谷子图鉴'}
+              items={list.slice((page - 1) * 12, page * 12).map((p) => ({
+                id: p.id,
+                product: p,
+                badge: p.typeDefinition.name,
+                summary: (
+                  <>
+                    <strong>{invFor(p.id)?.currentQuantity ?? 0} 件在手</strong>
+                    {path === '/inventory' && (
+                      <small>
+                        均价{' '}
+                        {price(
+                          invFor(p.id)?.currentQuantity
+                            ? Number(invFor(p.id)!.currentCost) / invFor(p.id)!.currentQuantity
+                            : 0,
+                        )}{' '}
+                        · 挂出 {listingCount(p.id)} 件
+                      </small>
+                    )}
+                  </>
+                ),
+                actions: (
+                  <button
+                    className="small-btn"
+                    onClick={() => setDialog({ type: 'purchase', productId: p.id })}
+                  >
+                    记录买入
+                  </button>
+                ),
+              }))}
+            />
+          ) : (
+            empty('这里还没有谷子', path === '/inventory' ? '记录买入' : '添加商品', () =>
+              setDialog({ type: path === '/inventory' ? 'purchase' : 'product' }),
+            )
+          )}
           <div className="pagination">
             <button disabled={page === 1} onClick={() => setPage(page - 1)}>
               上一页
@@ -695,100 +750,117 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
     } else if (path === '/purchases')
       content = purchasesList(
         data.purchases.filter(
-          (p) => matches(p.productId) && (!status || p.arrivalStatus === status),
+          (p) =>
+            matches(p.productId) &&
+            (!status ||
+              (status === 'IN_TRANSIT'
+                ? ['PENDING', 'SHIPPED'].includes(p.arrivalStatus)
+                : p.arrivalStatus === status)),
         ),
       );
     else if (path === '/sales') content = salesList(data.sales.filter((s) => matches(s.productId)));
-    else if (path === '/listings')
+    else if (path === '/listings') {
+      const entries = data.listings.filter(
+        (l) => matches(l.inventory.productId) && (!status || l.status === status),
+      );
       content = (
         <>
-          <div className="notice">挂出不减少库存。确认真正成交后，库存与挂出数量才会同步扣减。</div>
-          <div className="record-list">
-            {data.listings
-              .filter((l) => matches(l.inventory.productId) && (!status || l.status === status))
-              .map((l) => (
-                <article className="record" key={l.id}>
-                  {recordProduct(l.inventory.productId)}
-                  <div>
-                    <small>剩余挂出 / 原挂出</small>
-                    <strong>
-                      {l.remainingQuantity} / {l.quantity} 件
-                    </strong>
-                  </div>
-                  <strong>{price(l.unitPrice)}</strong>
-                  <span className="pill">{statusNames[l.status]}</span>
-                  {l.status === 'ACTIVE' && (
-                    <div className="record-actions">
-                      {actionButton('sale', '确认成交', l.id, l.inventory.productId)}
-                      <button
-                        className="small-btn"
-                        onClick={() => act('listing.cancel', { id: l.id })}
-                      >
-                        撤下
-                      </button>
-                      <Link className="small-btn" href="/posters">
-                        制作出物图
-                      </Link>
-                    </div>
-                  )}
-                </article>
-              ))}
+          <div className="notice">
+            挂出不扣库存。选择出物记录可直接制作海报，实际成交后再扣库存。
           </div>
-          {!data.listings.length &&
-            empty('让喜欢遇见下一位收藏家', '新建出物', () => setDialog({ type: 'listing' }))}
+          <CollectionGallery
+            heading="出物收藏"
+            extra={
+              <Link className="primary gallery-poster-link" href="/posters?source=listings">
+                批量制作出物图
+              </Link>
+            }
+            items={entries.map((l) => ({
+              id: l.id,
+              product: productById(l.inventory.productId)!,
+              badge: statusNames[l.status],
+              summary: (
+                <>
+                  <strong>{price(l.unitPrice)} / 件</strong>
+                  <small>
+                    剩余挂出 {l.remainingQuantity} / {l.quantity} 件
+                  </small>
+                </>
+              ),
+              actions:
+                l.status === 'ACTIVE' ? (
+                  <>
+                    {actionButton('sale', '确认成交', l.id, l.inventory.productId)}
+                    <Link className="small-btn" href={'/posters?source=listings&id=' + l.id}>
+                      制作出物图
+                    </Link>
+                    <button
+                      className="small-btn"
+                      onClick={() => act('listing.cancel', { id: l.id })}
+                    >
+                      撤下
+                    </button>
+                  </>
+                ) : undefined,
+            }))}
+          />
         </>
       );
-    else if (path === '/wanted')
-      content = (
-        <div className="record-list">
-          {data.wanted
-            .filter((w) => matches(w.productId) && (!status || w.status === status))
-            .map((w) => (
-              <article className="record" key={w.id}>
-                {recordProduct(w.productId)}
-                <div>
-                  <small>已收 / 想收</small>
-                  <strong>
-                    {w.fulfilledQuantity} / {w.wantedQuantity} 件
-                  </strong>
-                </div>
-                <div>
-                  <small>心理价位</small>
-                  <strong>{w.targetPrice ? price(w.targetPrice) : '随缘'}</strong>
-                </div>
-                <span className="pill">{statusNames[w.status]}</span>
-                <div className="record-actions">
-                  {!['FULFILLED', 'CANCELLED'].includes(w.status) && (
-                    <>
-                      <button
-                        className="small-btn"
-                        onClick={() =>
-                          act('wanted.progress', { id: w.id, fulfilledQuantity: w.wantedQuantity })
-                        }
-                      >
-                        仅标记收齐
-                      </button>
-                      <button
-                        className="small-btn"
-                        onClick={() =>
-                          setDialog({ type: 'purchase', productId: w.productId, wantedId: w.id })
-                        }
-                      >
-                        记录买入
-                      </button>
-                    </>
-                  )}
-                  <Link className="small-btn" href="/posters">
-                    制作收物图
-                  </Link>
-                </div>
-              </article>
-            ))}
-          {!data.wanted.length &&
-            empty('写下下一份心愿', '添加收物', () => setDialog({ type: 'wanted' }))}
-        </div>
+    } else if (path === '/wanted') {
+      const entries = data.wanted.filter(
+        (w) =>
+          matches(w.productId) &&
+          (!status ||
+            (status === 'ACTIVE' ? ['WANTED', 'PARTIAL'].includes(w.status) : w.status === status)),
       );
-    else if (path === '/groups')
+      content = (
+        <CollectionGallery
+          heading="收物心愿"
+          extra={
+            <Link className="primary gallery-poster-link" href="/posters?source=wanted">
+              批量制作收物图
+            </Link>
+          }
+          items={entries.map((w) => ({
+            id: w.id,
+            product: productById(w.productId)!,
+            badge: statusNames[w.status],
+            summary: (
+              <>
+                <strong>{w.targetPrice ? price(w.targetPrice) : '价格可议'} / 件</strong>
+                <small>
+                  已收 {w.fulfilledQuantity} / 想收 {w.wantedQuantity} 件
+                </small>
+                <small>{w.notes}</small>
+              </>
+            ),
+            actions: !['FULFILLED', 'CANCELLED'].includes(w.status) ? (
+              <>
+                <Link className="small-btn" href={'/posters?source=wanted&id=' + w.id}>
+                  制作收物图
+                </Link>
+                <button
+                  className="small-btn"
+                  onClick={() =>
+                    setDialog({ type: 'purchase', productId: w.productId, wantedId: w.id })
+                  }
+                >
+                  记录买入
+                </button>
+                <button
+                  className="small-btn"
+                  onClick={() =>
+                    act('wanted.progress', { id: w.id, fulfilledQuantity: w.wantedQuantity })
+                  }
+                >
+                  仅标记收齐
+                </button>
+              </>
+            ) : undefined,
+          }))}
+        />
+      );
+    } else if (path === '/groups')
       content = (
         <div className="group-grid">
           {data.groups
@@ -913,16 +985,26 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
           </div>
         </>
       );
-    else if (path.startsWith('/posters')) content = <PosterEditor data={data} onSaved={load} />;
+    else if (path.startsWith('/posters'))
+      content = (
+        <PosterEditor
+          key={searchParams.toString()}
+          data={data}
+          onSaved={load}
+          source={searchParams.get('source') ?? undefined}
+          sourceId={searchParams.get('id') ?? undefined}
+        />
+      );
     else if (path === '/admin')
       content = (
         <>
           <div className="page-intro">
             <span className="eyebrow">CURATE YOUR ENCYCLOPEDIA</span>
             <h1>整理图鉴里的喜欢</h1>
-            <p>维护角色、系列和商品。商品图片在详情页上传与增强。</p>
+            <p>上传商品图、维护系列和类型，名称会自动组合。</p>
             <div className="button-row">
               {actionButton('product', '添加商品')}
+              {actionButton('productType', '新增谷子类型')}
               {actionButton('entity', '添加 IP / 角色 / 系列 / 标签')}
             </div>
           </div>
@@ -935,6 +1017,21 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                 </span>
                 <span className="pill">{p.status === 'ACTIVE' ? '展示中' : '已归档'}</span>
                 {actionButton('productEdit', '编辑', p.id)}
+                <label className="upload-button">
+                  <Upload size={16} />
+                  {imageBusy ? '上传中…' : '上传图片'}
+                  <input
+                    aria-label={'上传图片 ' + p.name}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    disabled={imageBusy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void upload(file, p.id);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
                 <button
                   className="small-btn"
                   onClick={() =>
@@ -1135,7 +1232,13 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
         })}
       </nav>
       {dialog && data && (
-        <ActionForm dialog={dialog} data={data} onClose={() => setDialog(null)} onSave={save} />
+        <ActionForm
+          dialog={dialog}
+          data={data}
+          onClose={() => setDialog(null)}
+          onSave={save}
+          onRefresh={load}
+        />
       )}
       {filter && data && (
         <div className="modal-backdrop">
@@ -1152,7 +1255,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                 ['角色', character, setCharacter, data.characters.map((c) => [c.id, c.name])],
                 ['系列', series, setSeries, data.series.map((s) => [s.id, s.name])],
                 ['标签', tag, setTag, data.tags.map((t) => [t.id, t.name])],
-                ['商品类型', type, setType, Object.entries(typeNames)],
+                ['商品类型', type, setType, data.productTypes.map((t) => [t.key, t.name])],
                 [
                   '状态',
                   status,

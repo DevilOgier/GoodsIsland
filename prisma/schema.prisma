@@ -92,6 +92,7 @@ model Product {
   appearanceKey String @default("default")
   description String @default("")
   productType String
+  typeDefinition ProductType @relation(fields: [productType], references: [key])
   status String @default("ACTIVE")
   selectedSource String @default("ORIGINAL")
   originalId String? @db.Uuid
@@ -458,4 +459,14 @@ model ImageJob {
   attempts Int @default(0)
   leaseUntil DateTime?
   @@index([status, createdAt])
+}
+
+model ProductType {
+  id String @id @default(uuid()) @db.Uuid
+  key String @unique
+  name String @unique
+  status String @default("ACTIVE")
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  products Product[]
 }

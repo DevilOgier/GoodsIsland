@@ -1,0 +1,1 @@
+INSERT INTO "PosterTemplate" ("id","key","version","name","rendererKey","defaultConfig","status","createdAt","updatedAt") SELECT gen_random_uuid(),"key",2,"name","key",jsonb_build_object('layoutVersion',2),"status",CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM "PosterTemplate" WHERE "version"=1 ON CONFLICT ("key","version") DO NOTHING;

@@ -1,3 +1,4 @@
+import { renderPoster as legacyRender } from './legacy-renderer';
 export type PosterItemData = {
   productId: string;
   name: string;
@@ -12,12 +13,36 @@ export type PosterData = {
   ratio: string;
   template: string;
   items: PosterItemData[];
+  version?: number;
 };
-export const templates: Record<string, { background: string; accent: string; label: string }> = {
-  cute: { background: '#f6eaf0', accent: '#a76c89', label: '奶油手帐' },
-  simple: { background: '#eaf0e9', accent: '#657954', label: '清新画廊' },
-  retro: { background: '#f0e5d2', accent: '#98754a', label: '复古票根' },
-  minimal: { background: '#f5f5f3', accent: '#454b47', label: '极简留白' },
+export const templates: Record<
+  string,
+  { background: string; accent: string; label: string; description: string }
+> = {
+  cute: {
+    background: '#f6eaf0',
+    accent: '#a76c89',
+    label: '奶油手帐',
+    description: '拍立得拼贴 · 纸胶带 · 手写标签',
+  },
+  simple: {
+    background: '#eaf0e9',
+    accent: '#657954',
+    label: '清新画廊',
+    description: '首图主视觉 · 其余商品分栏陈列',
+  },
+  retro: {
+    background: '#f0e5d2',
+    accent: '#98754a',
+    label: '复古票根',
+    description: '横向票券 · 齿孔虚线 · 编号存根',
+  },
+  minimal: {
+    background: '#f5f5f3',
+    accent: '#454b47',
+    label: '极简留白',
+    description: '图文目录 · 细线分隔 · 编号索引',
+  },
 };
 export const ratios: Record<string, [number, number]> = {
   '1:1': [1, 1],
@@ -31,144 +56,321 @@ const escape = (s: string) =>
     /[&<>"']/g,
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!,
   );
-function lines(s: string, limit: number) {
+function wrap(s: string, width: number, font: number) {
+  const limit = width / font;
   const result: string[] = [];
   let line = '',
-    count = 0;
+    length = 0;
   for (const ch of s) {
-    const width = ch.charCodeAt(0) > 255 ? 1 : 0.55;
-    if (count + width > limit) {
+    const delta = ch.charCodeAt(0) > 255 ? 1 : 0.6;
+    if (length + delta > limit && line) {
       result.push(line);
       line = '';
-      count = 0;
+      length = 0;
     }
     line += ch;
-    count += width;
+    length += delta;
   }
   if (line) result.push(line);
   return result;
 }
-export function renderPoster(data: PosterData) {
-  const ratio = ratios[data.ratio];
-  if (!ratio) throw Error('不支持的比例');
-  const t = templates[data.template];
-  if (!t) throw Error('模板不存在');
-  if (!data.items.length || data.items.length > 12) throw Error('请选择1至12件商品');
-  const width = 1200,
-    height = Math.round((width * ratio[1]) / ratio[0]);
-  const margin = 48,
-    gap = 24;
-  const cols = Math.min(
-    data.items.length,
-    data.ratio === '9:16' ? 2 : data.ratio === '16:9' ? 4 : 3,
+const text = (x: number, y: number, value: string, size = 20, color = '#30352e', extra = '') =>
+  '<text x="' +
+  x +
+  '" y="' +
+  y +
+  '" font-size="' +
+  size +
+  '" fill="' +
+  color +
+  '" ' +
+  extra +
+  '>' +
+  escape(value) +
+  '</text>';
+function picture(item: PosterItemData, x: number, y: number, w: number, h: number, bg: string) {
+  if (item.image && /^data:image\/(png|jpeg|webp);base64,/.test(item.image))
+    return (
+      '<image href="' +
+      item.image +
+      '" x="' +
+      x +
+      '" y="' +
+      y +
+      '" width="' +
+      w +
+      '" height="' +
+      h +
+      '" preserveAspectRatio="xMidYMid meet"/>'
+    );
+  return (
+    '<rect x="' +
+    x +
+    '" y="' +
+    y +
+    '" width="' +
+    w +
+    '" height="' +
+    h +
+    '" fill="' +
+    bg +
+    '"/>' +
+    text(x + w / 2, y + h / 2, '暂无商品图', 18, '#888', 'text-anchor="middle"')
   );
-  const rows = Math.ceil(data.items.length / cols);
-  const cellW = (width - margin * 2 - gap * (cols - 1)) / cols;
-  const available = height - 240;
-  const cellH = (available - gap * (rows - 1)) / rows;
-  if (cellH < 220) throw Error('当前比例放不下这些商品，请减少商品或选择竖版');
-  let body = '';
-  data.items.forEach((item, i) => {
+}
+function info(
+  item: PosterItemData,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  accent: string,
+  font = 22,
+) {
+  const names = wrap(item.name, w, font),
+    notes = wrap(item.note, w, 16);
+  const needed = names.length * (font + 7) + notes.length * 22 + 62;
+  if (needed > h) throw Error('商品名称或备注较长，当前模板放不下；请减少商品或改用竖版');
+  let out = '';
+  names.forEach((line, i) => {
+    out += text(x, y + font + i * (font + 7), line, font);
+  });
+  let baseline = y + names.length * (font + 7) + 34;
+  out += text(
+    x,
+    baseline,
+    item.price ? '¥' + item.price : '价格可议',
+    25,
+    accent,
+    'font-weight="bold"',
+  );
+  out += text(x + w, baseline, '× ' + item.quantity, 20, accent, 'text-anchor="end"');
+  baseline += 25;
+  notes.forEach((line, i) => {
+    out += text(x, baseline + i * 22, line, 16, '#777');
+  });
+  return out;
+}
+export function renderPoster(data: PosterData) {
+  if (data.version === 1) return legacyRender(data);
+  const ratio = ratios[data.ratio],
+    t = templates[data.template];
+  if (!ratio || !t) throw Error('比例或模板无效');
+  if (!data.items.length || data.items.length > 12) throw Error('请选择1至12件商品');
+  for (const item of data.items) {
     if (!Number.isSafeInteger(item.quantity) || item.quantity < 1) throw Error('数量必须为正整数');
     if (item.price && !/^\d+(\.\d{1,2})?$/.test(item.price)) throw Error('价格格式不正确');
-    const nameLines = lines(item.name, Math.floor((cellW - 32) / 18));
-    const noteLines = lines(item.note, Math.floor((cellW - 32) / 14));
-    const textHeight = nameLines.length * 24 + noteLines.length * 19 + 60;
-    const imageH = cellH - textHeight - 28;
-    if (imageH < 70) throw Error('文字较长，请减少商品或改用竖版');
-    const x = margin + (i % cols) * (cellW + gap),
-      y = 175 + Math.floor(i / cols) * (cellH + gap);
-    const safeImage =
-      item.image && /^data:image\/(png|jpeg|webp);base64,/.test(item.image) ? item.image : null;
+  }
+  const W = 1200,
+    H = Math.round((W * ratio[1]) / ratio[0]),
+    x = 48,
+    y = 174,
+    w = W - 96,
+    h = H - 222,
+    gap = 24,
+    n = data.items.length;
+  let body = '';
+  function card(
+    item: PosterItemData,
+    cx: number,
+    cy: number,
+    cw: number,
+    ch: number,
+    index: number,
+    polaroid: boolean,
+  ) {
+    const font = cw > 500 ? 27 : 20;
+    const reserved =
+      wrap(item.name, cw - 36, font).length * (font + 7) +
+      wrap(item.note, cw - 36, 16).length * 22 +
+      80;
+    const ih = ch - reserved - 32;
+    if (ih < 65) throw Error('当前模板空间不足，请减少商品或选择竖版');
     body +=
-      '<g transform="translate(' +
-      x +
+      '<g data-layout="' +
+      (polaroid ? 'polaroid' : 'gallery-card') +
+      '" transform="translate(' +
+      cx +
       ',' +
-      y +
-      ')"><rect width="' +
-      cellW +
+      cy +
+      ')"><rect x="3" y="5" width="' +
+      cw +
       '" height="' +
-      cellH +
-      '" rx="' +
-      (data.template === 'retro' ? 2 : 18) +
-      '" fill="#ffffff" fill-opacity=".9"/>';
-    body += safeImage
-      ? '<image href="' +
-        safeImage +
-        '" x="16" y="14" width="' +
-        (cellW - 32) +
-        '" height="' +
-        imageH +
-        '" preserveAspectRatio="xMidYMid meet"/>'
-      : '<rect x="16" y="14" width="' +
-        (cellW - 32) +
-        '" height="' +
-        imageH +
-        '" rx="10" fill="' +
-        t.background +
-        '"/><text x="' +
-        cellW / 2 +
-        '" y="' +
-        (imageH / 2 + 18) +
-        '" text-anchor="middle" fill="' +
-        t.accent +
-        '" font-size="18">暂无商品图</text>';
-    nameLines.forEach((l, j) => {
-      body +=
-        '<text x="16" y="' +
-        (imageH + 42 + j * 24) +
-        '" font-size="18" fill="#30352e">' +
-        escape(l) +
-        '</text>';
-    });
-    const py = imageH + 42 + nameLines.length * 24;
+      ch +
+      '" fill="#000" opacity=".04"/><rect width="' +
+      cw +
+      '" height="' +
+      ch +
+      '" fill="white" rx="' +
+      (polaroid ? 3 : 0) +
+      '"/>';
     body +=
-      '<text x="16" y="' +
-      py +
-      '" font-size="22" font-weight="bold" fill="' +
-      t.accent +
-      '">' +
-      (item.price ? '¥' + escape(item.price) : '价格可议') +
-      '</text><text x="' +
-      (cellW - 16) +
-      '" y="' +
-      py +
-      '" text-anchor="end" font-size="17" fill="#555">× ' +
-      item.quantity +
-      '</text>';
-    noteLines.forEach((l, j) => {
+      picture(item, 18, 18, cw - 36, ih, t.background) +
+      info(item, 18, ih + 30, cw - 36, reserved, t.accent, font);
+    if (polaroid)
       body +=
-        '<text x="16" y="' +
-        (py + 25 + j * 19) +
-        '" font-size="14" fill="#777">' +
-        escape(l) +
-        '</text>';
-    });
+        '<rect x="' +
+        (cw / 2 - 39) +
+        '" y="-8" width="78" height="22" fill="' +
+        t.accent +
+        '" opacity=".23" transform="rotate(' +
+        (index % 2 ? -5 : 5) +
+        ' ' +
+        cw / 2 +
+        ' 3)"/>';
     body += '</g>';
-  });
+  }
+  if (data.template === 'cute') {
+    const cols = Math.min(n, data.ratio === '16:9' ? 3 : data.ratio === '9:16' ? 2 : 3),
+      rows = Math.ceil(n / cols),
+      cw = (w - (cols - 1) * gap) / cols,
+      ch = (h - (rows - 1) * gap) / rows;
+    data.items.forEach((item, i) =>
+      card(
+        item,
+        x + (i % cols) * (cw + gap),
+        y + Math.floor(i / cols) * (ch + gap),
+        cw,
+        ch,
+        i,
+        true,
+      ),
+    );
+  } else if (data.template === 'simple') {
+    const heroH = n === 1 ? h : Math.min(h * 0.42, 420),
+      hero = data.items[0],
+      iw = w * 0.57;
+    body +=
+      '<g data-layout="gallery-hero">' +
+      picture(hero, x, y, iw, heroH, t.background) +
+      text(x + iw + 30, y + 26, '01 / FEATURED', 13, t.accent, 'letter-spacing="3"') +
+      info(hero, x + iw + 30, y + 58, w - iw - 30, heroH - 58, t.accent, 27) +
+      '</g>';
+    if (n > 1) {
+      const cols = Math.min(n - 1, data.ratio === '9:16' ? 2 : 3),
+        rows = Math.ceil((n - 1) / cols),
+        cw = (w - (cols - 1) * gap) / cols,
+        ch = (h - heroH - gap - (rows - 1) * gap) / rows;
+      data.items
+        .slice(1)
+        .forEach((item, i) =>
+          card(
+            item,
+            x + (i % cols) * (cw + gap),
+            y + heroH + gap + Math.floor(i / cols) * (ch + gap),
+            cw,
+            ch,
+            i,
+            false,
+          ),
+        );
+    }
+  } else {
+    const ticket = data.template === 'retro',
+      cols = n > 4 ? 2 : 1,
+      rows = Math.ceil(n / cols),
+      cw = (w - (cols - 1) * gap) / cols,
+      ch = (h - (rows - 1) * gap) / rows;
+    data.items.forEach((item, i) => {
+      if (ch < 155) throw Error('当前目录容纳不下这些商品，请减少商品或选择竖版');
+      const cx = x + (i % cols) * (cw + gap),
+        cy = y + Math.floor(i / cols) * (ch + gap),
+        pad = ticket ? 20 : 12,
+        iw = cw * (ticket ? 0.42 : 0.32),
+        stub = ticket ? 46 : 0;
+      body +=
+        '<g data-layout="' +
+        (ticket ? 'ticket' : 'editorial-row') +
+        '" transform="translate(' +
+        cx +
+        ',' +
+        cy +
+        ')">';
+      if (ticket) {
+        body +=
+          '<rect width="' +
+          cw +
+          '" height="' +
+          ch +
+          '" fill="#fffbef"/><path d="M ' +
+          (cw - stub) +
+          ' 0 V ' +
+          ch +
+          '" stroke="' +
+          t.accent +
+          '" stroke-dasharray="5 7"/><circle cx="0" cy="' +
+          ch / 2 +
+          '" r="10" fill="' +
+          t.background +
+          '"/><circle cx="' +
+          cw +
+          '" cy="' +
+          ch / 2 +
+          '" r="10" fill="' +
+          t.background +
+          '"/>' +
+          text(
+            cw - 16,
+            ch / 2,
+            String(i + 1).padStart(2, '0'),
+            18,
+            t.accent,
+            'text-anchor="middle"',
+          );
+      } else
+        body +=
+          '<path d="M 0 ' +
+          (ch - 1) +
+          ' H ' +
+          cw +
+          '" stroke="#c7cdc4"/>' +
+          text(0, 20, String(i + 1).padStart(2, '0'), 13, t.accent);
+      body +=
+        picture(item, pad, pad, iw - pad * 2, ch - pad * 2, t.background) +
+        info(
+          item,
+          iw + 20,
+          pad,
+          cw - iw - pad - 20 - stub,
+          ch - pad * 2,
+          t.accent,
+          cw > 800 ? 26 : 19,
+        ) +
+        '</g>';
+    });
+  }
+  const titleX = data.template === 'cute' ? W / 2 : 48,
+    anchor = data.template === 'cute' ? 'text-anchor="middle"' : '';
+  let heading =
+    text(
+      titleX,
+      62,
+      data.type === 'SALE' ? 'PASS ON THE LITTLE JOYS' : 'LOOKING FOR LITTLE JOYS',
+      13,
+      t.accent,
+      anchor + ' letter-spacing="3"',
+    ) + text(titleX, 121, data.title, 38, '#30352e', anchor + ' font-weight="bold"');
+  if (data.template === 'retro')
+    heading += '<path d="M 48 144 H 1152" stroke="' + t.accent + '" stroke-dasharray="8 6"/>';
+  if (data.template === 'minimal')
+    heading +=
+      '<path d="M 48 145 H 1152" stroke="#454b47"/>' +
+      text(1152, 62, 'NO. ' + String(n).padStart(2, '0'), 14, t.accent, 'text-anchor="end"');
   return (
     '<svg xmlns="http://www.w3.org/2000/svg" width="' +
-    width +
+    W +
     '" height="' +
-    height +
+    H +
     '" viewBox="0 0 ' +
-    width +
+    W +
     ' ' +
-    height +
+    H +
     '"><rect width="100%" height="100%" fill="' +
     t.background +
-    '"/><g font-family="Microsoft YaHei, Noto Sans SC, sans-serif"><text x="48" y="64" fill="' +
-    t.accent +
-    '" font-size="14" letter-spacing="4">GUYU COLLECTION · ' +
-    data.type +
-    '</text><text x="48" y="123" fill="#30352e" font-size="38" font-weight="bold">' +
-    escape(data.title.slice(0, 24)) +
-    '</text>' +
+    '"/><g font-family="Microsoft YaHei, Noto Sans SC, sans-serif">' +
+    heading +
     body +
-    '<text x="48" y="' +
-    (height - 28) +
-    '" font-size="13" fill="' +
-    t.accent +
-    '" letter-spacing="2">收藏有迹，喜欢无价。</text></g></svg>'
+    text(48, H - 19, '收藏有迹，喜欢无价。', 12, t.accent) +
+    '</g></svg>'
   );
 }

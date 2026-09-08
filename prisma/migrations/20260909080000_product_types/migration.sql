@@ -1,0 +1,11 @@
+CREATE TABLE "ProductType" ("id" UUID NOT NULL, "key" TEXT NOT NULL, "name" TEXT NOT NULL, "status" TEXT NOT NULL DEFAULT 'ACTIVE', "createdAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "ProductType_pkey" PRIMARY KEY ("id"));
+CREATE UNIQUE INDEX "ProductType_key_key" ON "ProductType"("key");
+CREATE UNIQUE INDEX "ProductType_name_key" ON "ProductType"("name");
+INSERT INTO "ProductType" ("id","key","name") VALUES ('bbaaaaaa-0000-4000-8000-000000000000','BADGE','徽章');
+INSERT INTO "ProductType" ("id","key","name") VALUES ('bbaaaaaa-0000-4000-8000-000000000001','STANDEE','亚克力立牌');
+INSERT INTO "ProductType" ("id","key","name") VALUES ('bbaaaaaa-0000-4000-8000-000000000002','POSTCARD','明信片');
+INSERT INTO "ProductType" ("id","key","name") VALUES ('bbaaaaaa-0000-4000-8000-000000000003','BONUS','特典');
+INSERT INTO "ProductType" ("id","key","name") VALUES ('bbaaaaaa-0000-4000-8000-000000000004','KEYCHAIN','钥匙扣');
+INSERT INTO "ProductType" ("id","key","name") VALUES ('bbaaaaaa-0000-4000-8000-000000000005','PLUSH','毛绒');
+INSERT INTO "ProductType" ("id","key","name") VALUES ('bbaaaaaa-0000-4000-8000-000000000006','OTHER','其他');
+ALTER TABLE "Product" ADD CONSTRAINT "Product_productType_fkey" FOREIGN KEY ("productType") REFERENCES "ProductType"("key") ON DELETE RESTRICT ON UPDATE CASCADE;

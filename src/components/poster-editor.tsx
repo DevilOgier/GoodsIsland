@@ -1,41 +1,78 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Download, Palette, Save, Plus, X } from 'lucide-react';
 import type { Snapshot } from './types';
 import { renderPoster, templates, ratios } from '@/poster/renderer';
 import type { PosterItemData } from '@/poster/renderer';
+import { posterPrefill } from '@/domain/poster-prefill';
+import ProductPicker from './product-picker';
+async function assetData(id: string) {
+  const r = await fetch('/api/images/' + id);
+  if (!r.ok) throw Error('商品图片加载失败');
+  const blob = await r.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export default function PosterEditor({
   data,
   onSaved,
+  source,
+  sourceId,
 }: {
   data: Snapshot;
   onSaved: () => Promise<void>;
+  source?: string;
+  sourceId?: string;
 }) {
-  const [type, setType] = useState<'SALE' | 'WANTED'>('SALE');
-  const [title, setTitle] = useState('出一些心动收藏');
+  const [initial] = useState(() => posterPrefill(data, source, sourceId));
+  const [type, setType] = useState<'SALE' | 'WANTED'>(initial.type);
+  const [version, setVersion] = useState(2);
+  const [picking, setPicking] = useState(false);
+  const [imageLoading, setImageLoading] = useState(!!Object.keys(initial.assets).length);
+  const [title, setTitle] = useState(initial.title);
   const [ratio, setRatio] = useState('1:1');
   const [template, setTemplate] = useState('cute');
-  const [items, setItems] = useState<PosterItemData[]>([]);
+  const [items, setItems] = useState<PosterItemData[]>(initial.items);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const rendered = useMemo(() => {
     try {
-      return { svg: renderPoster({ title, type, ratio, template, items }), error: '' };
+      return { svg: renderPoster({ title, type, ratio, template, items, version }), error: '' };
     } catch (e) {
       return { svg: '', error: (e as Error).message };
     }
-  }, [title, type, ratio, template, items]);
-  async function assetData(id: string) {
-    const r = await fetch('/api/images/' + id);
-    if (!r.ok) throw Error('商品图片加载失败');
-    const blob = await r.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
+  }, [title, type, ratio, template, items, version]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      Object.entries(initial.assets).map(
+        async ([id, asset]) => [id, await assetData(asset)] as const,
+      ),
+    )
+      .then((images) => {
+        if (cancelled) return;
+        setItems((current) =>
+          current.map((item) => ({
+            ...item,
+            image: images.find(([id]) => id === item.productId)?.[1] ?? item.image,
+          })),
+        );
+      })
+      .catch((e) => {
+        if (!cancelled) setError((e as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) setImageLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initial]);
   async function add(productId: string) {
     if (!productId || items.some((i) => i.productId === productId)) return;
     const p = data.products.find((p) => p.id === productId)!;
@@ -43,10 +80,11 @@ export default function PosterEditor({
     try {
       const asset = p.selectedSource === 'ENHANCED' && p.enhancedId ? p.enhancedId : p.originalId;
       const image = asset ? await assetData(asset) : undefined;
-      setItems((old) => [
-        ...old,
-        { productId, name: p.name, quantity: 1, price: '', note: '', image },
-      ]);
+      setItems((old) =>
+        old.some((i) => i.productId === productId)
+          ? old
+          : [...old, { productId, name: p.name, quantity: 1, price: '', note: '', image }],
+      );
     } catch (e) {
       setError((e as Error).message);
     }
@@ -55,6 +93,7 @@ export default function PosterEditor({
     setBusy(true);
     setError('');
     try {
+      if (imageLoading) throw Error('图片还在加载，请稍候');
       if (!rendered.svg) throw Error(rendered.error);
       await document.fonts.ready;
       const url = URL.createObjectURL(
@@ -143,14 +182,16 @@ export default function PosterEditor({
             <input maxLength={24} value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
           <h3>02 / 放进你的喜欢</h3>
-          <select aria-label="添加海报商品" value="" onChange={(e) => void add(e.target.value)}>
-            <option value="">＋ 选择商品</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <button className="poster-picker-button" onClick={() => setPicking(true)}>
+            <Plus size={16} /> 从系列图鉴添加
+          </button>
+          {source && (
+            <p className="notice">
+              已带入{source === 'wanted' ? '未收齐心愿' : '剩余挂出'}
+              的商品、数量、价格和备注，可以继续编辑。
+            </p>
+          )}
+          {imageLoading && <p className="muted">正在加载商品图片…</p>}
           {items.map((item, i) => (
             <div className="poster-item" key={item.productId}>
               <div>
@@ -215,15 +256,19 @@ export default function PosterEditor({
                 className={template === key ? 'selected' : ''}
                 style={{ background: t.background }}
                 key={key}
-                onClick={() => setTemplate(key)}
+                onClick={() => {
+                  setTemplate(key);
+                  setVersion(2);
+                }}
               >
-                {t.label}
+                <strong>{t.label}</strong>
+                <small>{t.description}</small>
               </button>
             ))}
           </div>
           <p className="muted">导出海报不会挂出或扣库存。挂出请在“正在出物”中操作。</p>
           <button
-            disabled={busy || !rendered.svg}
+            disabled={busy || imageLoading || !rendered.svg}
             onClick={async () => {
               setBusy(true);
               setError('');
@@ -236,6 +281,7 @@ export default function PosterEditor({
                     type,
                     ratio,
                     template,
+                    templateVersion: version,
                     items: items.map(({ productId, quantity, price, note }) => ({
                       productId,
                       quantity,
@@ -286,17 +332,33 @@ export default function PosterEditor({
           <div className="export-actions">
             <button
               className="primary"
-              disabled={busy || !rendered.svg}
+              disabled={busy || imageLoading || !rendered.svg}
               onClick={() => exportImage('png')}
             >
               <Download size={16} /> 导出 PNG
             </button>
-            <button disabled={busy || !rendered.svg} onClick={() => exportImage('jpeg')}>
+            <button
+              disabled={busy || imageLoading || !rendered.svg}
+              onClick={() => exportImage('jpeg')}
+            >
               导出 JPG
             </button>
           </div>
         </section>
       </div>
+      {picking && (
+        <ProductPicker
+          data={data}
+          allowedIds={products
+            .filter((p) => !items.some((i) => i.productId === p.id))
+            .map((p) => p.id)}
+          onClose={() => setPicking(false)}
+          onSelect={(p) => {
+            void add(p.id);
+            setPicking(false);
+          }}
+        />
+      )}
       <section className="section-heading">
         <h2>我的作品集</h2>
         <span>{data.posters.length} 张</span>
@@ -310,6 +372,7 @@ export default function PosterEditor({
               setTitle(p.title);
               setRatio(p.ratio);
               setTemplate(p.template.key);
+              setVersion(p.template.version);
               try {
                 const loaded = await Promise.all(
                   p.items.map(async (i) => ({

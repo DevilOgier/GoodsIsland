@@ -1,5 +1,6 @@
 import { db } from '@/infrastructure/db';
 export const productInclude = {
+  typeDefinition: true,
   series: { include: { character: { include: { ip: true } } } },
   tags: { include: { tag: true } },
 } as const;
@@ -19,6 +20,7 @@ export async function snapshot(userId: string) {
     posters,
     templates,
     jobs,
+    productTypes,
   ] = await Promise.all([
     db.product.findMany({ include: productInclude, orderBy: { createdAt: 'desc' } }),
     db.iP.findMany(),
@@ -57,6 +59,7 @@ export async function snapshot(userId: string) {
     }),
     db.posterTemplate.findMany({ where: { status: 'ACTIVE' } }),
     db.imageJob.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 30 }),
+    db.productType.findMany({ where: { status: 'ACTIVE' }, orderBy: { createdAt: 'asc' } }),
   ]);
   return {
     products,
@@ -73,6 +76,7 @@ export async function snapshot(userId: string) {
     posters,
     templates,
     jobs,
+    productTypes,
     provider: process.env.IMAGE_ENHANCEMENT_PROVIDER ?? 'mock',
   };
 }
