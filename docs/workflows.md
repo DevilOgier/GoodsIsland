@@ -1,5 +1,7 @@
 # 核心业务流程和状态机
 
+> 更新：用户已确认设计；晚补运费立即支持，取代原 D4 限制。当前实现与实际接口见 [实施状态](implementation.md) 和 [成本调整](cost-adjustments.md)。下文保留原设计用于追溯。
+
 以下采用待确认的实物库存口径。任何私有操作先认证、校验所有权及 Zod 输入，再进入服务层。变更请求有 Idempotency-Key；相同 key 不同 payload 返回 409。并发先锁 Inventory，再锁关联 Listing/Wanted，统一锁顺序。
 
 ## 买入与到货

@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  email String @unique
+  name String
+  passwordHash String
+  role String @default("ADMIN")
+  sessions Session[]
+  inventories Inventory[]
+  purchases Purchase[]
+  sales Sale[]
+  groups GroupBuy[]
+  wanted Wanted[]
+  posters Poster[]
+  requests MutationRequest[]
+  assets ImageAsset[]
+  jobs ImageJob[]
+  uploads UploadIntent[]
+}
+
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  tokenHash String @unique
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  @@index([userId])
+}
+
+model IP {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  name String @unique
+  description String @default("")
+  coverImage String?
+  sortOrder Int @default(0)
+  status String @default("ACTIVE")
+  characters Character[]
+}
+
+model Character {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  ipId String @db.Uuid
+  ip IP @relation(fields: [ipId], references: [id])
+  name String
+  description String @default("")
+  avatar String?
+  sortOrder Int @default(0)
+  status String @default("ACTIVE")
+  series Series[]
+  @@unique([ipId, name])
+  @@index([ipId])
+}
+
+model Series {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  characterId String @db.Uuid
+  character Character @relation(fields: [characterId], references: [id])
+  name String
+  description String @default("")
+  coverImage String?
+  sortOrder Int @default(0)
+  status String @default("ACTIVE")
+  products Product[]
+  @@unique([characterId, name])
+  @@index([characterId])
+}
+
+model Product {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  seriesId String @db.Uuid
+  series Series @relation(fields: [seriesId], references: [id])
+  name String
+  appearanceKey String @default("default")
+  description String @default("")
+  productType String
+  status String @default("ACTIVE")
+  selectedSource String @default("ORIGINAL")
+  originalId String? @db.Uuid
+  enhancedId String? @db.Uuid
+  thumbnailId String? @db.Uuid
+  original ImageAsset? @relation("original", fields: [originalId], references: [id])
+  enhanced ImageAsset? @relation("enhanced", fields: [enhancedId], references: [id])
+  thumbnail ImageAsset? @relation("thumbnail", fields: [thumbnailId], references: [id])
+  imageVersion Int @default(0)
+  tags ProductTag[]
+  inventories Inventory[]
+  purchases Purchase[]
+  sales Sale[]
+  groupItems GroupBuyItem[]
+  wanted Wanted[]
+  posterItems PosterItem[]
+  jobs ImageJob[]
+  @@unique([seriesId, appearanceKey, name, productType])
+  @@index([seriesId, status])
+  @@index([productType])
+}
+
+model Tag {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  name String @unique
+  color String @default("#a89ac8")
+  status String @default("ACTIVE")
+  products ProductTag[]
+}
+
+model ProductTag {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  productId String @db.Uuid
+  tagId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id])
+  tag Tag @relation(fields: [tagId], references: [id])
+  @@unique([productId, tagId])
+  @@index([tagId])
+}
+
+model Inventory {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  productId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  currentQuantity Int @default(0)
+  currentCost Decimal @default(0) @db.Decimal(18,2)
+  version Int @default(0)
+  events InventoryEvent[]
+  listings SaleListing[]
+  revisions CostRevision[]
+  @@unique([userId, productId])
+  @@index([productId])
+}
+
+model InventoryEvent {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  sequence Int @unique @default(autoincrement())
+  inventoryId String @db.Uuid
+  inventory Inventory @relation(fields: [inventoryId], references: [id])
+  type String
+  quantityDelta Int
+  costDelta Decimal @db.Decimal(18,2)
+  purchaseId String? @unique @db.Uuid
+  purchase Purchase? @relation(fields: [purchaseId], references: [id])
+  saleId String? @unique @db.Uuid
+  sale Sale? @relation(fields: [saleId], references: [id])
+  reason String @default("")
+  @@index([inventoryId, createdAt])
+  @@index([createdAt])
+}
+
+model Purchase {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  productId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  quantity Int
+  unitPrice Decimal @db.Decimal(18,2)
+  productAmount Decimal @db.Decimal(18,2)
+  domesticShipping Decimal @default(0) @db.Decimal(18,2)
+  internationalShipping Decimal @default(0) @db.Decimal(18,2)
+  otherFee Decimal @default(0) @db.Decimal(18,2)
+  actualCost Decimal @db.Decimal(18,2)
+  purchaseChannel String
+  purchaseDate DateTime @db.Date
+  arrivalStatus String @default("PENDING")
+  arrivedAt DateTime?
+  groupBuyId String? @db.Uuid
+  groupBuy GroupBuy? @relation(fields: [groupBuyId], references: [id])
+  groupBuyItemId String? @unique @db.Uuid
+  groupBuyItem GroupBuyItem? @relation(fields: [groupBuyItemId], references: [id])
+  wantedId String? @db.Uuid
+  wanted Wanted? @relation(fields: [wantedId], references: [id])
+  updateWanted Boolean @default(false)
+  notes String @default("")
+  event InventoryEvent?
+  adjustments FeeAdjustment[]
+  @@index([userId, purchaseDate])
+  @@index([productId])
+  @@index([groupBuyId])
+  @@index([userId, arrivalStatus])
+}
+
+model FeeAdjustment {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  purchaseId String @db.Uuid
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  domesticShipping Decimal @default(0) @db.Decimal(18,2)
+  internationalShipping Decimal @default(0) @db.Decimal(18,2)
+  otherFee Decimal @default(0) @db.Decimal(18,2)
+  amount Decimal @db.Decimal(18,2)
+  reason String
+  revision CostRevision?
+}
+
+model CostRevision {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  inventoryId String @db.Uuid
+  inventory Inventory @relation(fields: [inventoryId], references: [id])
+  feeAdjustmentId String @unique @db.Uuid
+  feeAdjustment FeeAdjustment @relation(fields: [feeAdjustmentId], references: [id])
+  inventoryCostDelta Decimal @db.Decimal(18,2)
+  details Json
+  saleAdjustments SaleCostAdjustment[]
+}
+
+model SaleCostAdjustment {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  saleId String @db.Uuid
+  sale Sale @relation(fields: [saleId], references: [id])
+  revisionId String @db.Uuid
+  revision CostRevision @relation(fields: [revisionId], references: [id])
+  amount Decimal @db.Decimal(18,2)
+  @@unique([saleId, revisionId])
+}
+
+model SaleListing {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  inventoryId String @db.Uuid
+  inventory Inventory @relation(fields: [inventoryId], references: [id])
+  quantity Int
+  remainingQuantity Int
+  unitPrice Decimal @db.Decimal(18,2)
+  status String @default("ACTIVE")
+  notes String @default("")
+  sales Sale[]
+  @@index([inventoryId, status])
+}
+
+model Sale {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  productId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  listingId String? @db.Uuid
+  listing SaleListing? @relation(fields: [listingId], references: [id])
+  quantity Int
+  unitPrice Decimal @db.Decimal(18,2)
+  totalAmount Decimal @db.Decimal(18,2)
+  allocatedActualCost Decimal @db.Decimal(18,2)
+  saleChannel String
+  saleDate DateTime @db.Date
+  notes String @default("")
+  event InventoryEvent?
+  costAdjustments SaleCostAdjustment[]
+  @@index([userId, saleDate])
+  @@index([productId])
+  @@index([listingId])
+}
+
+model GroupBuy {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  name String
+  description String @default("")
+  groupOwner String
+  openTime DateTime?
+  closeTime DateTime?
+  status String @default("OPEN")
+  notes String @default("")
+  items GroupBuyItem[]
+  purchases Purchase[]
+  @@index([userId, status])
+}
+
+model GroupBuyItem {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  groupId String @db.Uuid
+  group GroupBuy @relation(fields: [groupId], references: [id])
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id])
+  quantity Int
+  unitPrice Decimal @db.Decimal(18,2)
+  paymentStatus String @default("UNPAID")
+  shippingStatus String @default("NOT_SHIPPED")
+  dispatchStatus String @default("NOT_DISPATCHED")
+  notes String @default("")
+  purchase Purchase?
+  @@index([groupId])
+  @@index([productId])
+}
+
+model Wanted {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  productId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+  wantedQuantity Int
+  fulfilledQuantity Int @default(0)
+  targetPrice Decimal? @db.Decimal(18,2)
+  priority String @default("NORMAL")
+  status String @default("WANTED")
+  notes String @default("")
+  purchases Purchase[]
+  @@index([userId, status])
+  @@index([productId])
+}
+
+model PosterTemplate {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  key String
+  version Int @default(1)
+  name String
+  rendererKey String
+  defaultConfig Json
+  status String @default("ACTIVE")
+  posters Poster[]
+  @@unique([key, version])
+}
+
+model Poster {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  type String
+  ratio String
+  templateId String @db.Uuid
+  template PosterTemplate @relation(fields: [templateId], references: [id])
+  templateConfig Json
+  title String
+  status String @default("SAVED")
+  items PosterItem[]
+  @@index([userId, type])
+}
+
+model PosterItem {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  posterId String @db.Uuid
+  poster Poster @relation(fields: [posterId], references: [id])
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id])
+  imageAssetId String? @db.Uuid
+  imageAsset ImageAsset? @relation(fields: [imageAssetId], references: [id])
+  quantity Int
+  price Decimal? @db.Decimal(18,2)
+  note String @default("")
+  sortOrder Int
+  productSnapshot Json
+  @@unique([posterId, sortOrder])
+}
+
+model MutationRequest {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  operation String
+  key String
+  requestHash String
+  response Json
+  @@unique([userId, operation, key])
+}
+
+model ImageAsset {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  kind String
+  objectKey String @unique
+  mimeType String
+  width Int
+  height Int
+  bytes Int
+  checksum String
+  sourceId String? @db.Uuid
+  source ImageAsset? @relation("derived", fields: [sourceId], references: [id])
+  derivatives ImageAsset[] @relation("derived")
+  isMock Boolean @default(false)
+  originals Product[] @relation("original")
+  enhancedProducts Product[] @relation("enhanced")
+  thumbnails Product[] @relation("thumbnail")
+  posterItems PosterItem[]
+}
+
+model UploadIntent {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  productId String @db.Uuid
+  objectKey String @unique
+  mimeType String
+  status String @default("PENDING")
+  expiresAt DateTime
+  @@index([userId])
+}
+
+model ImageJob {
+  id String @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz
+  updatedAt DateTime @updatedAt @db.Timestamptz
+  userId String @db.Uuid
+  user User @relation(fields: [userId], references: [id])
+  productId String @db.Uuid
+  product Product @relation(fields: [productId], references: [id])
+  originalId String @db.Uuid
+  imageVersion Int
+  provider String
+  status String @default("QUEUED")
+  error String?
+  providerRequestId String?
+  attempts Int @default(0)
+  leaseUntil DateTime?
+  @@index([status, createdAt])
+}

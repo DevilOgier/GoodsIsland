@@ -1,0 +1,30 @@
+services:
+  web:
+    build: .
+    env_file: .env
+    environment:
+      WEB_HOST: 0.0.0.0
+    ports: ['3000:3000']
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+  worker:
+    build: .
+    command: ['node', '--import', 'tsx', 'src/workers/image-worker.ts']
+    env_file: .env
+    depends_on:
+      db: { condition: service_healthy }
+    restart: unless-stopped
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: guzi
+      POSTGRES_USER: guzi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes: [postgres-data:/var/lib/postgresql]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U guzi']
+      interval: 5s
+      retries: 10
+volumes:
+  postgres-data:

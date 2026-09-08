@@ -1,5 +1,7 @@
 # API 设计
 
+> 更新：用户已确认设计；晚补运费立即支持，取代原 D4 限制。当前实现与实际接口见 [实施状态](implementation.md) 和 [成本调整](cost-adjustments.md)。下文保留原设计用于追溯。
+
 前缀 `/api/v1`，JSON，Zod 验证。A=ADMIN；U=登录用户、仅本人；P=公共图鉴读（公开访问可配置）。Server Actions 复用相同 service，不另写数据库规则。写接口校验 session、Origin/CSRF；私有响应 Cache-Control: no-store。
 
 ## 公共图鉴与身份

@@ -20,3 +20,5 @@ backups/
 *.pem
 *.key
 weights/
+.local/
+.pnpm-store/

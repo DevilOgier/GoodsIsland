@@ -1,5 +1,7 @@
 # ER Model 与数据库表结构
 
+> 更新：用户已确认设计；晚补运费立即支持，取代原 D4 限制。当前实现与实际接口见 [实施状态](implementation.md) 和 [成本调整](cost-adjustments.md)。下文保留原设计用于追溯。
+
 这是设计稿，未生成 Prisma Schema 或 migration。采用 [D1–D9 推荐口径](decisions.md)，待确认后固化。
 
 ## 通用约定
