@@ -53,10 +53,37 @@ export async function arrive(tx: Tx, userId: string, id: string) {
   });
 }
 export async function buy(tx: Tx, userId: string, raw: unknown) {
-  const d = purchaseSchema.parse(raw);
+  const { groupId, newGroup, ...d } = purchaseSchema.parse(raw);
+  ensure(
+    [groupId, newGroup, d.groupBuyItemId].filter(Boolean).length <= 1,
+    '请选择一种拼团关联方式',
+  );
+  ensure(
+    d.purchaseChannel !== '拼团' || groupId || newGroup || d.groupBuyItemId,
+    '请选择已有拼团或创建新团',
+  );
+  ensure(
+    !(groupId || newGroup || d.groupBuyItemId) || d.purchaseChannel === '拼团',
+    '关联拼团时购买渠道必须为拼团',
+  );
   const product = await tx.product.findFirst({ where: { id: d.productId, status: 'ACTIVE' } });
   ensure(product, '商品不存在或已归档');
   let groupBuyId: string | undefined;
+  if (groupId || newGroup) {
+    const group = newGroup
+      ? await tx.groupBuy.create({ data: { ...newGroup, userId } })
+      : await tx.groupBuy.findFirst({ where: { id: groupId, userId, status: 'OPEN' } });
+    ensure(group, '拼团不存在或已截团');
+    const item = await tx.groupBuyItem.create({
+      data: {
+        groupId: group.id,
+        productId: d.productId,
+        quantity: d.quantity,
+        unitPrice: d.unitPrice,
+      },
+    });
+    d.groupBuyItemId = item.id;
+  }
   if (d.groupBuyItemId) {
     const item = await tx.groupBuyItem.findFirst({
       where: { id: d.groupBuyItemId, group: { userId } },
@@ -64,6 +91,7 @@ export async function buy(tx: Tx, userId: string, raw: unknown) {
     });
     ensure(item && item.productId === d.productId, '团项不存在或商品不一致');
     ensure(!item.purchase, '该团项已关联购买', 409);
+    ensure(item.quantity === d.quantity, '购入数量必须与团项数量一致');
     ensure(!['CANCELLED', 'COMPLETED'].includes(item.group.status), '拼团已结束');
     groupBuyId = item.groupId;
   }

@@ -13,6 +13,14 @@ export const purchaseSchema = z.object({
   purchaseDate: z.iso.date(),
   arrivalStatus: z.enum(['PENDING', 'SHIPPED', 'ARRIVED']).default('PENDING'),
   groupBuyItemId: uuid.optional(),
+  groupId: uuid.optional(),
+  newGroup: z
+    .object({
+      name: z.string().trim().min(1).max(100),
+      groupOwner: z.string().trim().min(1).max(100),
+      notes: z.string().max(2000).default(''),
+    })
+    .optional(),
   wantedId: uuid.optional(),
   updateWanted: z.boolean().default(false),
   notes: z.string().max(2000).default(''),

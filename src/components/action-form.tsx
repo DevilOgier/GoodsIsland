@@ -33,6 +33,17 @@ export default function ActionForm({
   const [error, setError] = useState('');
   const [pickedId, setPickedId] = useState(dialog.productId ?? '');
   const [picking, setPicking] = useState(false);
+  const linkedGroup =
+    dialog.type === 'purchase' && dialog.id
+      ? data.groups.find((g) => g.items.some((i) => i.id === dialog.id))
+      : undefined;
+  const linkedItem = linkedGroup?.items.find((i) => i.id === dialog.id);
+  const [channel, setChannel] = useState(linkedGroup ? '拼团' : '闲鱼');
+  const [groupChoice, setGroupChoice] = useState(linkedGroup?.id ?? '');
+  const [itemChoice, setItemChoice] = useState('');
+  const chosenGroup = data.groups.find((g) => g.id === groupChoice);
+  const availableItems =
+    chosenGroup?.items.filter((i) => i.productId === pickedId && !i.purchase) ?? [];
   const picked = data.products.find((p) => p.id === pickedId);
   if (['product', 'productEdit'].includes(dialog.type))
     return (
@@ -74,8 +85,8 @@ export default function ActionForm({
       op = 'purchase.create';
       fields = [
         product,
-        qty,
-        unit,
+        { ...qty, value: linkedItem ? String(linkedItem.quantity) : '1' },
+        { ...unit, value: linkedItem ? String(linkedItem.unitPrice) : '0' },
         {
           name: 'purchaseChannel',
           label: '购买渠道',
@@ -277,6 +288,20 @@ export default function ActionForm({
             try {
               if (fields.some((f) => f.name === 'productId') && !pickedId)
                 throw Error('请先从系列图鉴选择谷子');
+              if (dialog.type === 'purchase' && channel === '拼团' && !linkedItem) {
+                if (!groupChoice) throw Error('请选择已有拼团或创建新团');
+                if (groupChoice === '__new')
+                  payload.newGroup = {
+                    name: payload.newGroupName,
+                    groupOwner: payload.newGroupOwner,
+                    notes: payload.newGroupNotes ?? '',
+                  };
+                else if (itemChoice) payload.groupBuyItemId = itemChoice;
+                else payload.groupId = groupChoice;
+              }
+              delete payload.newGroupName;
+              delete payload.newGroupOwner;
+              delete payload.newGroupNotes;
               await onSave(op, payload);
               onClose();
             } catch (e) {
@@ -319,8 +344,16 @@ export default function ActionForm({
                   {f.label}
                   {f.options ? (
                     <select
+                      aria-label={f.label}
                       name={f.name}
-                      defaultValue={f.value ?? f.options[0]?.[0]}
+                      defaultValue={
+                        f.name === 'purchaseChannel' ? undefined : (f.value ?? f.options[0]?.[0])
+                      }
+                      value={f.name === 'purchaseChannel' ? channel : undefined}
+                      onChange={
+                        f.name === 'purchaseChannel' ? (e) => setChannel(e.target.value) : undefined
+                      }
+                      disabled={f.name === 'purchaseChannel' && !!linkedItem}
                       required={f.required !== false}
                     >
                       {f.options.map(([value, label]) => (
@@ -351,6 +384,94 @@ export default function ActionForm({
               ),
             )}
           </div>
+          {dialog.type === 'purchase' && channel === '拼团' && (
+            <fieldset className="purchase-group-fields">
+              <legend>这份谷子来自哪个团？</legend>
+              {linkedItem ? (
+                <>
+                  <input type="hidden" name="purchaseChannel" value="拼团" />
+                  <p>
+                    已关联：{linkedGroup?.name} · {linkedGroup?.groupOwner}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <label>
+                    选择拼团
+                    <select
+                      aria-label="选择拼团"
+                      value={groupChoice}
+                      onChange={(e) => {
+                        setGroupChoice(e.target.value);
+                        setItemChoice('');
+                      }}
+                      required
+                    >
+                      <option value="">请选择已有团，或新建一个团</option>
+                      {data.groups
+                        .filter((g) => g.status === 'OPEN')
+                        .map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name} · {g.groupOwner}
+                          </option>
+                        ))}
+                      <option value="__new">＋ 在这里创建新团</option>
+                    </select>
+                  </label>
+                  {groupChoice === '__new' ? (
+                    <div className="form-grid">
+                      <label>
+                        新团名称
+                        <input
+                          name="newGroupName"
+                          required
+                          maxLength={100}
+                          placeholder="例如：春日系列一团"
+                        />
+                      </label>
+                      <label>
+                        团长 / 主催
+                        <input name="newGroupOwner" required maxLength={100} />
+                      </label>
+                      <label>
+                        拼团备注
+                        <input name="newGroupNotes" maxLength={2000} />
+                      </label>
+                      <p className="notice">
+                        确认保存时一并创建拼团和团内商品，已填写的购入信息会保留。
+                      </p>
+                    </div>
+                  ) : (
+                    groupChoice && (
+                      <>
+                        {availableItems.length > 0 && (
+                          <label>
+                            关联团内商品
+                            <select
+                              value={itemChoice}
+                              onChange={(e) => setItemChoice(e.target.value)}
+                            >
+                              <option value="">新增一条团内商品</option>
+                              {availableItems.map((i) => (
+                                <option key={i.id} value={i.id}>
+                                  已有团项：{i.quantity} 件 · 单价 ¥{i.unitPrice}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                        <p className="notice">
+                          {itemChoice
+                            ? '购入数量需与所选团项一致。'
+                            : '将按本次商品、数量和单价添加团项，并关联购入记录。'}
+                        </p>
+                      </>
+                    )
+                  )}
+                </>
+              )}
+            </fieldset>
+          )}
           {dialog.wantedId && (
             <label className="check-row">
               <input type="checkbox" name="updateWanted" />
@@ -384,6 +505,7 @@ export default function ActionForm({
           onClose={() => setPicking(false)}
           onSelect={(p) => {
             setPickedId(p.id);
+            setItemChoice('');
             setPicking(false);
           }}
         />

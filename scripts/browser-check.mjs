@@ -56,6 +56,7 @@ try {
   });
   await page.reload();
   await page.getByRole('link', { name: '浏览器验证商品', exact: true }).click();
+  await page.waitForURL('**/products/' + fixtureProduct.id);
   await page.getByRole('button', { name: '记录买入', exact: true }).click();
   await page.locator('input[name=quantity]').fill('3');
   await page.locator('input[name=unitPrice]').fill('10');
@@ -116,7 +117,7 @@ try {
   )
     throw Error('Failure damaged previous images');
   await page.goto('http://localhost:3000/posters');
-  await page.getByRole('button',{name:'从系列图鉴添加'}).click();
+  await page.getByRole('button', { name: '从系列图鉴添加' }).click();
   await page.getByLabel('搜索系列或商品').fill('浏览器验证商品');
   await page.locator('.series-tile').click();
   await page.locator('.picker-product').click();
