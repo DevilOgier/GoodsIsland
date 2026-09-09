@@ -44,7 +44,13 @@ export async function createUpload(userId: string, productId: string, mime: stri
       expiresAt: new Date(Date.now() + 300000),
     },
   });
-  return { id: intent.id, url: await uploadUrl(objectKey, mime) };
+  return {
+    id: intent.id,
+    url:
+      process.env.LOCAL_SERVICES === 'true'
+        ? '/api/images/upload/' + intent.id
+        : await uploadUrl(objectKey, mime),
+  };
 }
 export async function completeUpload(userId: string, id: string) {
   const intent = await db.uploadIntent.findFirst({ where: { id, userId } });

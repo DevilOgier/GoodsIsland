@@ -18,5 +18,12 @@ export function fail(error: unknown) {
 export function originGuard(request: Request) {
   const origin = request.headers.get('origin');
   const expected = new URL(process.env.APP_URL ?? 'http://localhost:3000').origin;
-  if (!origin || origin !== expected) throw new DomainError('请求来源不匹配', 403);
+  const allowed = [
+    expected,
+    ...(process.env.ADDITIONAL_APP_ORIGINS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  ];
+  if (!origin || !allowed.includes(origin)) throw new DomainError('请求来源不匹配', 403);
 }

@@ -98,7 +98,12 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
   const save = async (op: string, payload: Record<string, unknown>) => {
     const r = await fetch('/api/commands', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =>
+          b.toString(16).padStart(2, '0'),
+        ).join(''),
+      },
       body: JSON.stringify({ operation: op, data: payload }),
     });
     const j = await r.json();
