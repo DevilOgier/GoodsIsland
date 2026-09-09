@@ -23,7 +23,6 @@ import {
   ArrowRight,
   X,
   Sparkles,
-  Image as ImageIcon,
   Upload,
   RefreshCw,
 } from 'lucide-react';
@@ -34,12 +33,14 @@ import ActionForm from './action-form';
 import type { Dialog } from './action-form';
 import PosterEditor from './poster-editor';
 import CollectionGallery from './collection-gallery';
+import AccountingPanel from './accounting-panel';
 const nav = [
   ['/', '我的小岛', LayoutDashboard],
   ['/products', '谷子图鉴', BookOpen],
   ['/inventory', '我的收藏柜', Archive],
   ['/purchases', '买入记录', ArrowDownLeft],
   ['/sales', '卖出记录', ArrowUpRight],
+  ['/accounting', '收支账本', BookOpen],
   ['/groups', '我的拼团', Users],
   ['/wanted', '收物心愿', Heart],
   ['/listings', '正在出物', Tag],
@@ -544,7 +545,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
       );
     else if (selected) {
       const inv = invFor(selected.id);
-      const job = data.jobs.find((j) => j.productId === selected.id);
+
       content = (
         <>
           <Link className="back-link" href="/products">
@@ -598,66 +599,6 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                 {actionButton('wanted', '我想收', undefined, selected.id)}
                 {actionButton('listing', '准备出物', undefined, selected.id)}
               </div>
-              {user.role === 'ADMIN' && (
-                <div className="image-tools">
-                  <h3>
-                    <ImageIcon size={16} /> 商品图片
-                  </h3>
-                  <div className="button-row">
-                    <label className="upload-button">
-                      <Upload size={16} />
-                      {imageBusy ? '处理中…' : '上传原图'}
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        disabled={imageBusy}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          if (f) void upload(f, selected.id);
-                        }}
-                      />
-                    </label>
-                    <button
-                      disabled={
-                        imageBusy ||
-                        !selected.originalId ||
-                        (!!job && ['RUNNING', 'QUEUED'].includes(job.status))
-                      }
-                      onClick={() => imageAction('enhance', selected.id)}
-                    >
-                      <Sparkles size={16} /> 保真高清{data.provider === 'mock' ? '（模拟）' : ''}
-                    </button>
-                    <button
-                      disabled={imageBusy || !selected.originalId}
-                      className={selected.selectedSource === 'ORIGINAL' ? 'selected' : ''}
-                      onClick={() => imageAction('select', selected.id, 'ORIGINAL')}
-                    >
-                      使用原图
-                    </button>
-                    {selected.enhancedId && (
-                      <button onClick={() => imageAction('select', selected.id, 'ENHANCED')}>
-                        使用高清图
-                      </button>
-                    )}
-                  </div>
-                  <small className="muted">
-                    原图永远保留。
-                    {data.provider === 'mock'
-                      ? '当前是 Mock 模拟放大，尚未调用真实 AI。'
-                      : '高清化使用 Topaz。'}
-                  </small>
-                  {job && (
-                    <p className="job-state">
-                      {statusNames[job.status]} {job.error}
-                      {job.status === 'FAILED' && (
-                        <button className="small-btn" onClick={() => imageAction('retry', job.id)}>
-                          重试
-                        </button>
-                      )}
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
           </section>
           <section className="section-heading">
@@ -1000,6 +941,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
           sourceId={searchParams.get('id') ?? undefined}
         />
       );
+    else if (path === '/accounting') content = <AccountingPanel data={data} />;
     else if (path === '/admin')
       content = (
         <>
@@ -1022,6 +964,49 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                 </span>
                 <span className="pill">{p.status === 'ACTIVE' ? '展示中' : '已归档'}</span>
                 {actionButton('productEdit', '编辑', p.id)}
+                <div className="catalog-image-controls">
+                  <button
+                    className="small-btn"
+                    disabled={
+                      imageBusy ||
+                      !p.originalId ||
+                      data.jobs.some(
+                        (j) => j.productId === p.id && ['RUNNING', 'QUEUED'].includes(j.status),
+                      )
+                    }
+                    onClick={() => imageAction('enhance', p.id)}
+                  >
+                    <Sparkles size={14} />
+                    保真高清{data.provider === 'mock' ? '（模拟）' : ''}
+                  </button>
+                  <button
+                    className="small-btn"
+                    disabled={imageBusy || !p.originalId}
+                    onClick={() => imageAction('select', p.id, 'ORIGINAL')}
+                  >
+                    使用原图
+                  </button>
+                  {p.enhancedId && (
+                    <button
+                      className="small-btn"
+                      disabled={imageBusy}
+                      onClick={() => imageAction('select', p.id, 'ENHANCED')}
+                    >
+                      使用高清图
+                    </button>
+                  )}
+                  {data.jobs
+                    .filter((j) => j.productId === p.id)
+                    .slice(0, 1)
+                    .map((j) => (
+                      <small key={j.id}>
+                        {statusNames[j.status]} {j.error}
+                        {j.status === 'FAILED' && (
+                          <button onClick={() => imageAction('retry', j.id)}>重试</button>
+                        )}
+                      </small>
+                    ))}
+                </div>
                 <label className="upload-button">
                   <Upload size={16} />
                   {imageBusy ? '上传中…' : '上传图片'}
@@ -1150,53 +1135,61 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
           </div>
         </header>
         <div className="content">
-          {path !== '/' && !selected && !groupDetail && !path.startsWith('/posters') && (
-            <div className="toolbar">
-              <h2>{section}</h2>
-              <div className="toolbar-controls">
-                <div className="search-box">
-                  <Search size={17} />
-                  <input
-                    aria-label="搜索谷子"
-                    placeholder="搜索谷子、角色、系列…"
-                    value={q}
-                    onChange={(e) => {
-                      setQ(e.target.value);
-                      setPage(1);
-                    }}
-                  />
+          {path !== '/' &&
+            !selected &&
+            !groupDetail &&
+            !path.startsWith('/posters') &&
+            path !== '/accounting' && (
+              <div className="toolbar">
+                <h2>{section}</h2>
+                <div className="toolbar-controls">
+                  <div className="search-box">
+                    <Search size={17} />
+                    <input
+                      aria-label="搜索谷子"
+                      placeholder="搜索谷子、角色、系列…"
+                      value={q}
+                      onChange={(e) => {
+                        setQ(e.target.value);
+                        setPage(1);
+                      }}
+                    />
+                  </div>
+                  <button
+                    className="filter-button"
+                    aria-label="筛选"
+                    onClick={() => setFilter(true)}
+                  >
+                    <SlidersHorizontal size={17} />
+                    <span>筛选</span>
+                  </button>
+                  <button
+                    className="primary"
+                    onClick={() =>
+                      setDialog({
+                        type:
+                          path === '/purchases'
+                            ? 'purchase'
+                            : path === '/sales'
+                              ? 'sale'
+                              : path === '/groups'
+                                ? 'group'
+                                : path === '/wanted'
+                                  ? 'wanted'
+                                  : path === '/listings'
+                                    ? 'listing'
+                                    : path === '/inventory'
+                                      ? 'purchase'
+                                      : 'product',
+                      })
+                    }
+                  >
+                    <Plus size={17} />
+                    <span>添加</span>
+                  </button>
                 </div>
-                <button className="filter-button" aria-label="筛选" onClick={() => setFilter(true)}>
-                  <SlidersHorizontal size={17} />
-                  <span>筛选</span>
-                </button>
-                <button
-                  className="primary"
-                  onClick={() =>
-                    setDialog({
-                      type:
-                        path === '/purchases'
-                          ? 'purchase'
-                          : path === '/sales'
-                            ? 'sale'
-                            : path === '/groups'
-                              ? 'group'
-                              : path === '/wanted'
-                                ? 'wanted'
-                                : path === '/listings'
-                                  ? 'listing'
-                                  : path === '/inventory'
-                                    ? 'purchase'
-                                    : 'product',
-                    })
-                  }
-                >
-                  <Plus size={17} />
-                  <span>添加</span>
-                </button>
               </div>
-            </div>
-          )}
+            )}
           {error ? (
             <div className="empty">
               <p className="error">{error}</p>

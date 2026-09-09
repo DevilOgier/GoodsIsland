@@ -73,16 +73,22 @@ try {
   await sharp({ create: { width: 160, height: 160, channels: 4, background: '#9cab87' } })
     .png()
     .toFile('.local/upload-test.png');
-  await page.locator('input[type=file]').setInputFiles('.local/upload-test.png');
+  if (await page.locator('input[type=file]').count())
+    throw Error('Product details must not edit catalog images');
+  await page.goto('http://localhost:3000/admin');
+  const imageRow = page.locator('article.record').filter({ hasText: '浏览器验证商品' });
+  await imageRow.locator('input[type=file]').setInputFiles('.local/upload-test.png');
   await page.getByText('原图已安全保存').waitFor({ timeout: 15000 });
   const checksum = (
     await db.imageAsset.findFirstOrThrow({ where: { userId: user.id, kind: 'ORIGINAL' } })
   ).checksum;
-  await page.getByRole('button', { name: '保真高清（模拟）' }).click();
-  await page.getByRole('button', { name: '使用高清图', exact: true }).waitFor({ timeout: 20000 });
+  await imageRow.getByRole('button', { name: '保真高清（模拟）' }).click();
+  await imageRow
+    .getByRole('button', { name: '使用高清图', exact: true })
+    .waitFor({ timeout: 20000 });
   await Promise.all([
     page.waitForResponse((r) => r.url().endsWith('/api/images') && r.request().method() === 'POST'),
-    page.getByRole('button', { name: '使用原图', exact: true }).click(),
+    imageRow.getByRole('button', { name: '使用原图', exact: true }).click(),
   ]);
   const updated = await db.product.findUniqueOrThrow({
     where: { id: fixtureProduct.id },

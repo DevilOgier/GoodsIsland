@@ -1,0 +1,43 @@
+name: Validate GoodsIsland
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: guzi
+          POSTGRES_PASSWORD: ci-test-only
+          POSTGRES_DB: guzi
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U guzi' --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://guzi:ci-test-only@localhost:5432/guzi
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable && corepack prepare pnpm@11.19.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:generate && pnpm exec next typegen
+      - run: pnpm lint && pnpm typecheck && pnpm test
+      - run: pnpm exec prisma migrate deploy && pnpm exec tsx prisma/seed.ts
+      - run: pnpm exec tsx --test --test-concurrency=1 tests/integration/*.test.ts
+      - run: bash -n deploy/update.sh
+      - name: Validate server compose
+        run: |
+          cp deploy/server.env.example deploy/.env
+          docker compose --env-file deploy/.env -f deploy/compose.yaml config --quiet
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
