@@ -25,6 +25,7 @@ import {
   Sparkles,
   Upload,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
 import { price, statusNames } from './types';
@@ -119,6 +120,17 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
     } catch (e) {
       notify((e as Error).message);
     }
+  };
+  const removeCatalog = async (
+    entity: 'product' | 'ip' | 'character' | 'series' | 'tag' | 'productType',
+    id: string,
+    name: string,
+  ) => {
+    const scope = ['ip', 'character', 'series'].includes(entity)
+      ? '以及其下没有业务记录的图鉴内容'
+      : '';
+    if (!window.confirm(`确定永久删除「${name}」${scope}吗？此操作不能撤销。`)) return;
+    await act('catalog.delete', { entity, id });
   };
   const imageAction = async (action: string, id: string, source?: string) => {
     setImageBusy(true);
@@ -1033,9 +1045,125 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                 >
                   {p.status === 'ACTIVE' ? '归档' : '恢复'}
                 </button>
+                <button
+                  className="small-btn danger"
+                  aria-label={'删除商品 ' + p.name}
+                  onClick={() => void removeCatalog('product', p.id, p.name)}
+                >
+                  <Trash2 size={14} /> 删除
+                </button>
               </article>
             ))}
           </div>
+          <section className="catalog-taxonomy">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">CATALOG STRUCTURE</span>
+                <h2>分类与类型管理</h2>
+              </div>
+              <p>删除 IP、角色或系列会同时删除其下没有图片和业务记录的图鉴内容。</p>
+            </div>
+            <div className="taxonomy-grid">
+              <article>
+                <h3>IP</h3>
+                {data.ips.map((item) => (
+                  <div className="taxonomy-row" key={item.id}>
+                    <span>{item.name}</span>
+                    <button
+                      className="small-btn danger"
+                      aria-label={'删除 IP ' + item.name}
+                      onClick={() => void removeCatalog('ip', item.id, item.name)}
+                    >
+                      <Trash2 size={14} /> 删除
+                    </button>
+                  </div>
+                ))}
+                {!data.ips.length && <small className="muted">暂无 IP</small>}
+              </article>
+              <article>
+                <h3>角色</h3>
+                {data.characters.map((item) => (
+                  <div className="taxonomy-row" key={item.id}>
+                    <span>
+                      <small>{data.ips.find((ip) => ip.id === item.ipId)?.name}</small>
+                      {item.name}
+                    </span>
+                    <button
+                      className="small-btn danger"
+                      aria-label={'删除角色 ' + item.name}
+                      onClick={() => void removeCatalog('character', item.id, item.name)}
+                    >
+                      <Trash2 size={14} /> 删除
+                    </button>
+                  </div>
+                ))}
+                {!data.characters.length && <small className="muted">暂无角色</small>}
+              </article>
+              <article>
+                <h3>系列</h3>
+                {data.series.map((item) => (
+                  <div className="taxonomy-row" key={item.id}>
+                    <span>
+                      <small>
+                        {
+                          data.characters.find((character) => character.id === item.characterId)
+                            ?.name
+                        }
+                      </small>
+                      {item.name}
+                    </span>
+                    <button
+                      className="small-btn danger"
+                      aria-label={'删除系列 ' + item.name}
+                      onClick={() => void removeCatalog('series', item.id, item.name)}
+                    >
+                      <Trash2 size={14} /> 删除
+                    </button>
+                  </div>
+                ))}
+                {!data.series.length && <small className="muted">暂无系列</small>}
+              </article>
+              <article>
+                <h3>自定义类型与标签</h3>
+                {data.productTypes
+                  .filter((item) => item.key.startsWith('CUSTOM_'))
+                  .map((item) => (
+                    <div className="taxonomy-row" key={item.key}>
+                      <span>
+                        <small>类型</small>
+                        {item.name}
+                      </span>
+                      <button
+                        className="small-btn danger"
+                        aria-label={'删除类型 ' + item.name}
+                        onClick={() => void removeCatalog('productType', item.key, item.name)}
+                      >
+                        <Trash2 size={14} /> 删除
+                      </button>
+                    </div>
+                  ))}
+                {data.tags.map((item) => (
+                  <div className="taxonomy-row" key={item.id}>
+                    <span>
+                      <small>标签</small>
+                      {item.name}
+                    </span>
+                    <button
+                      className="small-btn danger"
+                      aria-label={'删除标签 ' + item.name}
+                      onClick={() => void removeCatalog('tag', item.id, item.name)}
+                    >
+                      <Trash2 size={14} /> 删除
+                    </button>
+                  </div>
+                ))}
+                {!data.tags.length &&
+                  !data.productTypes.some((item) => item.key.startsWith('CUSTOM_')) && (
+                    <small className="muted">暂无自定义类型或标签</small>
+                  )}
+              </article>
+            </div>
+          </section>
         </>
       );
     else if (['/ips', '/characters', '/series'].includes(path))

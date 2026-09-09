@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../../src/infrastructure/db';
 import { command } from '../../src/domain/commands';
+import { createCatalogFixture, deleteCatalogFixture } from './catalog-fixture';
 test('自定义类型和服务端自动命名', async () => {
   const user = await db.user.create({
     data: {
@@ -14,8 +15,12 @@ test('自定义类型和服务端自动命名', async () => {
   });
   let typeKey: string | undefined;
   let productId: string | undefined;
+  const catalog = await createCatalogFixture(db, '图鉴测试');
   try {
-    const series = await db.series.findFirstOrThrow({ include: { character: true } });
+    const series = await db.series.findUniqueOrThrow({
+      where: { id: catalog.series.id },
+      include: { character: true },
+    });
     const t = (await command(
       user,
       'catalog.type',
@@ -50,6 +55,7 @@ test('自定义类型和服务端自动命名', async () => {
   } finally {
     if (productId) await db.product.delete({ where: { id: productId } });
     if (typeKey) await db.productType.delete({ where: { key: typeKey } });
+    await deleteCatalogFixture(db, catalog);
     await db.mutationRequest.deleteMany({ where: { userId: user.id } });
     await db.user.delete({ where: { id: user.id } });
     await db.$disconnect();

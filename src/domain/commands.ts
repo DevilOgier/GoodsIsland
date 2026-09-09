@@ -245,6 +245,95 @@ async function dispatch(
         return tx.character.create({ data: { name: d.name, ipId: d.parentId } });
       return tx.series.create({ data: { name: d.name, characterId: d.parentId } });
     }
+    if (op === 'catalog.delete') {
+      const d = z
+        .object({
+          entity: z.enum(['product', 'ip', 'character', 'series', 'tag', 'productType']),
+          id: z.string().min(1).max(100),
+        })
+        .parse(raw);
+      async function deleteProducts(ids: string[]) {
+        if (!ids.length) return;
+        const products = await tx.product.findMany({ where: { id: { in: ids } } });
+        const [inventories, purchases, sales, groupItems, wanted, posterItems, jobs, uploads] =
+          await Promise.all([
+            tx.inventory.count({ where: { productId: { in: ids } } }),
+            tx.purchase.count({ where: { productId: { in: ids } } }),
+            tx.sale.count({ where: { productId: { in: ids } } }),
+            tx.groupBuyItem.count({ where: { productId: { in: ids } } }),
+            tx.wanted.count({ where: { productId: { in: ids } } }),
+            tx.posterItem.count({ where: { productId: { in: ids } } }),
+            tx.imageJob.count({ where: { productId: { in: ids } } }),
+            tx.uploadIntent.count({ where: { productId: { in: ids } } }),
+          ]);
+        ensure(
+          products.every(
+            (product) => !product.originalId && !product.enhancedId && !product.thumbnailId,
+          ) &&
+            inventories + purchases + sales + groupItems + wanted + posterItems + jobs + uploads ===
+              0,
+          '所选内容已有图片、库存或业务记录，请使用归档保留历史',
+          409,
+        );
+        await tx.productTag.deleteMany({ where: { productId: { in: ids } } });
+        await tx.product.deleteMany({ where: { id: { in: ids } } });
+      }
+      if (d.entity === 'product') {
+        const id = z.uuid().parse(d.id);
+        ensure(await tx.product.findUnique({ where: { id } }), '图鉴商品不存在', 404);
+        await deleteProducts([id]);
+        return { id };
+      }
+      if (d.entity === 'series') {
+        const id = z.uuid().parse(d.id);
+        ensure(await tx.series.findUnique({ where: { id } }), '系列不存在', 404);
+        const products = await tx.product.findMany({
+          where: { seriesId: id },
+          select: { id: true },
+        });
+        await deleteProducts(products.map((product) => product.id));
+        await tx.series.delete({ where: { id } });
+        return { id };
+      }
+      if (d.entity === 'character') {
+        const id = z.uuid().parse(d.id);
+        ensure(await tx.character.findUnique({ where: { id } }), '角色不存在', 404);
+        const products = await tx.product.findMany({
+          where: { series: { characterId: id } },
+          select: { id: true },
+        });
+        await deleteProducts(products.map((product) => product.id));
+        await tx.series.deleteMany({ where: { characterId: id } });
+        await tx.character.delete({ where: { id } });
+        return { id };
+      }
+      if (d.entity === 'ip') {
+        const id = z.uuid().parse(d.id);
+        ensure(await tx.iP.findUnique({ where: { id } }), 'IP 不存在', 404);
+        const products = await tx.product.findMany({
+          where: { series: { character: { ipId: id } } },
+          select: { id: true },
+        });
+        await deleteProducts(products.map((product) => product.id));
+        await tx.series.deleteMany({ where: { character: { ipId: id } } });
+        await tx.character.deleteMany({ where: { ipId: id } });
+        await tx.iP.delete({ where: { id } });
+        return { id };
+      }
+      if (d.entity === 'tag') {
+        const id = z.uuid().parse(d.id);
+        await tx.productTag.deleteMany({ where: { tagId: id } });
+        await tx.tag.delete({ where: { id } });
+        return { id };
+      }
+      ensure(d.id.startsWith('CUSTOM_'), '系统内置谷子类型不能删除');
+      ensure(
+        (await tx.product.count({ where: { productType: d.id } })) === 0,
+        '请先删除或修改使用该类型的商品',
+      );
+      await tx.productType.delete({ where: { key: d.id } });
+      return { id: d.id };
+    }
     if (op === 'catalog.archive') {
       const d = z.object({ id: z.uuid(), status: z.enum(['ACTIVE', 'ARCHIVED']) }).parse(raw);
       return tx.product.update({ where: { id: d.id }, data: { status: d.status } });

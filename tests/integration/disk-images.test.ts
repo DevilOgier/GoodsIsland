@@ -8,6 +8,7 @@ import sharp from 'sharp';
 import { db } from '../../src/infrastructure/db';
 import { createUpload, completeUpload } from '../../src/domain/image-service';
 import { putObject, readObject } from '../../src/infrastructure/storage';
+import { createCatalogFixture, deleteCatalogFixture } from './catalog-fixture';
 test('磁盘图片流程：上传凭证、原图、缩略图与数据库关联', async () => {
   const root = await mkdtemp(join(tmpdir(), 'guzi-image-'));
   const oldDriver = process.env.STORAGE_DRIVER,
@@ -22,7 +23,8 @@ test('磁盘图片流程：上传凭证、原图、缩略图与数据库关联',
       role: 'ADMIN',
     },
   });
-  const series = await db.series.findFirstOrThrow();
+  const catalog = await createCatalogFixture(db, '图片测试');
+  const series = catalog.series;
   const product = await db.product.create({
     data: { seriesId: series.id, name: '磁盘图片测试', productType: 'BADGE' },
   });
@@ -50,9 +52,10 @@ test('磁盘图片流程：上传凭证、原图、缩略图与数据库关联',
       'webp',
     );
   } finally {
-    await db.product.delete({ where: { id: product.id } });
     await db.uploadIntent.deleteMany({ where: { userId: user.id } });
+    await db.product.delete({ where: { id: product.id } });
     await db.imageAsset.deleteMany({ where: { userId: user.id } });
+    await deleteCatalogFixture(db, catalog);
     await db.user.delete({ where: { id: user.id } });
     await db.$disconnect();
     if (oldDriver === undefined) delete process.env.STORAGE_DRIVER;

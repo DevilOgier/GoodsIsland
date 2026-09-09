@@ -16,14 +16,18 @@ export default function ProductArt({
         <img src={'/api/images/' + id} alt={product.name} />
       </div>
     );
+  const palettes = [
+    ['#edc8d5', '#f8e9ef', '#c884a0'],
+    ['#a7c7c3', '#e2eeea', '#61968f'],
+    ['#b8c9a7', '#edf1e4', '#819664'],
+    ['#c7b5cf', '#efe6f3', '#987dab'],
+  ];
+  const paletteKey = `${product.series.character.name}:${product.series.name}`;
   const palette =
-    product.series.character.name === '三月七'
-      ? ['#edc8d5', '#f8e9ef', '#c884a0']
-      : product.series.character.name === '丹恒'
-        ? ['#a7c7c3', '#e2eeea', '#61968f']
-        : product.series.character.name === '流萤'
-          ? ['#b8c9a7', '#edf1e4', '#819664']
-          : ['#c7b5cf', '#efe6f3', '#987dab'];
+    palettes[
+      [...paletteKey].reduce((sum, character) => sum + character.codePointAt(0)!, 0) %
+        palettes.length
+    ];
   return (
     <div
       className={'product-art placeholder ' + (large ? 'large' : '')}
@@ -64,7 +68,7 @@ export default function ProductArt({
           </>
         )}
         <text x="120" y="207" textAnchor="middle" fontSize="9" letterSpacing="3" fill={palette[2]}>
-          COLLECTION SAMPLE
+          IMAGE PENDING
         </text>
       </svg>
       <span className="sample-label">待上传实拍</span>

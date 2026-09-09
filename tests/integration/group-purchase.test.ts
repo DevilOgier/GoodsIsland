@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../../src/infrastructure/db';
 import { command } from '../../src/domain/commands';
+import { createCatalogFixture, deleteCatalogFixture } from './catalog-fixture';
 test('拼团购入：原子建团、已有团、已有团项、权限、回滚和幂等', async () => {
   const user = await db.user.create({
     data: {
@@ -12,7 +13,8 @@ test('拼团购入：原子建团、已有团、已有团项、权限、回滚�
       role: 'ADMIN',
     },
   });
-  const series = await db.series.findFirstOrThrow();
+  const catalog = await createCatalogFixture(db, '拼团测试');
+  const series = catalog.series;
   const product = await db.product.create({
     data: { seriesId: series.id, name: '拼团测试商品', productType: 'BADGE' },
   });
@@ -71,6 +73,7 @@ test('拼团购入：原子建团、已有团、已有团项、权限、回滚�
     await db.inventory.deleteMany({ where: { userId: user.id } });
     await db.mutationRequest.deleteMany({ where: { userId: user.id } });
     await db.product.delete({ where: { id: product.id } });
+    await deleteCatalogFixture(db, catalog);
     await db.user.delete({ where: { id: user.id } });
     await db.$disconnect();
   }

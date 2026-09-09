@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { db } from '../../src/infrastructure/db';
 import { command } from '../../src/domain/commands';
+import { createCatalogFixture, deleteCatalogFixture } from './catalog-fixture';
 let user: { id: string; role: string };
 let productId: string;
+let catalog: Awaited<ReturnType<typeof createCatalogFixture>>;
 const send = (op: string, data: unknown, key = randomUUID()) =>
   command(user, op, data, key) as Promise<Record<string, unknown>>;
 before(async () => {
@@ -16,7 +18,8 @@ before(async () => {
       role: 'ADMIN',
     },
   });
-  const s = await db.series.findFirstOrThrow();
+  catalog = await createCatalogFixture(db, '库存测试');
+  const s = catalog.series;
   const p = await db.product.create({
     data: { seriesId: s.id, name: '测试商品 ' + randomUUID(), productType: 'BADGE' },
   });
@@ -35,6 +38,7 @@ after(async () => {
   await db.inventory.deleteMany({ where: { userId: user.id } });
   await db.mutationRequest.deleteMany({ where: { userId: user.id } });
   await db.product.delete({ where: { id: productId } });
+  await deleteCatalogFixture(db, catalog);
   await db.user.delete({ where: { id: user.id } });
   await db.$disconnect();
 });

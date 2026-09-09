@@ -133,4 +133,4 @@ ratio 枚举 SQUARE/FOUR_THREE/THREE_FOUR/SIXTEEN_NINE/NINE_SIXTEEN。price=null
 - 交易与 Event 一一对应属于跨表不变量：所有写入统一服务事务，DB 约束阻止重复来源，集成测试和核对查询发现缺失。不得宣称单凭 FK 能强制“每 Sale 必有 Event”。
 - 不创建 Product→Inventory→Wanted 的强制链，收物本来可以零库存；GroupItem 也直接连 Product。
 - 列表游标 `(createdAt,id)` 保证稳定分页；初始关键词大小写无关匹配，中文数据增大时通过评估增加 pg_trgm，V1 不另建搜索服务。
-- 初始化 migration 在空 PostgreSQL 验证；后续 migration 在上一个版本和有样本数据的 DB 验证；种子数据仅示例元数据，不含 API 密钥或固定管理员密码。
+- 初始化 migration 在空 PostgreSQL 验证；后续 migration 在上一个版本和有样本数据的 DB 验证；种子数据只初始化系统内置类型和海报模板，不创建示例图鉴，也不含 API 密钥或固定管理员密码。

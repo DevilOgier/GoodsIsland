@@ -12,7 +12,7 @@ Windows 在项目目录运行：
 .\start-local.ps1
 ```
 
-脚本以隐藏窗口启动服务、应用 migration 并初始化示例图鉴。关闭浏览器或终端不清空数据。不要删除 `.local/postgres` 和 `.local/objects`。
+脚本以隐藏窗口启动服务、应用 migration 并初始化系统内置谷子类型与海报模板；图鉴初始为空。关闭浏览器或终端不清空数据。不要删除 `.local/postgres` 和 `.local/objects`。
 
 首次从 Git 安装（Node.js 24、pnpm 11）：
 
@@ -25,7 +25,7 @@ pnpm build
 
 随后运行 start-local.ps1。已有依赖的本机无需重复安装。开发可单独运行 `pnpm local:services`、`pnpm worker`、`pnpm dev`；已有服务运行时不要重复启动数据库。
 
-示例图鉴仅包含元数据和明确标注的占位图，不是商品实拍；个人库存初始为空。进入图鉴管理可上传自己的 PNG/JPG/WebP；买入、库存和商品详情不提供图片修改。
+图鉴和个人库存初始为空。进入图鉴管理可创建 IP、角色、系列和谷子类型并上传自己的 PNG/JPG/WebP；买入、库存和商品详情不提供图片修改。没有图片或业务记录的图鉴内容可在管理页彻底删除，已有记录时使用归档保留历史。
 
 ## 图片按钮
 
