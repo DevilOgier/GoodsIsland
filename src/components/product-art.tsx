@@ -9,11 +9,16 @@ export default function ProductArt({
   const id =
     product.selectedSource === 'ENHANCED' && product.enhancedId
       ? product.enhancedId
-      : product.originalId;
+      : (!large && product.thumbnailId) || product.originalId;
   if (id)
     return (
       <div className={'product-art ' + (large ? 'large' : '')}>
-        <img src={'/api/images/' + id} alt={product.name} />
+        <img
+          src={'/api/images/' + id}
+          alt={product.name}
+          loading={large ? 'eager' : 'lazy'}
+          decoding="async"
+        />
       </div>
     );
   const palettes = [

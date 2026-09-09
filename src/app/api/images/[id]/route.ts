@@ -11,7 +11,8 @@ export async function GET(_r: Request, { params }: { params: Promise<{ id: strin
     return new Response(new Uint8Array(await readObject(asset.objectKey)), {
       headers: {
         'Content-Type': asset.mimeType,
-        'Cache-Control': 'private, no-store',
+        'Cache-Control': 'private, max-age=86400',
+        Vary: 'Cookie',
         'X-Content-Type-Options': 'nosniff',
       },
     });

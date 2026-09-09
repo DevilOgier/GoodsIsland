@@ -28,6 +28,8 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
+import { createSnapshotCache } from '@/lib/snapshot-cache';
+const snapshotCache = createSnapshotCache<Snapshot>();
 import { price, statusNames } from './types';
 import ProductArt from './product-art';
 import ActionForm from './action-form';
@@ -48,7 +50,7 @@ const nav = [
   ['/posters', '海报工坊', Palette],
   ['/admin', '图鉴管理', Settings],
 ] as const;
-export default function Cabinet({ user }: { user: { name: string; role: string } }) {
+export default function Cabinet({ user }: { user: { id: string; name: string; role: string } }) {
   const router = useRouter();
   const path = usePathname();
   const searchParams = useSearchParams();
@@ -66,25 +68,36 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [page, setPage] = useState(1);
   const [imageBusy, setImageBusy] = useState(false);
-  const load = useCallback(async () => {
-    try {
-      const r = await fetch('/api/data', { cache: 'no-store' });
-      if (r.status === 401) {
-        router.replace('/login');
-        router.refresh();
-        return;
+  const load = useCallback(
+    async (force = true) => {
+      try {
+        const value = await snapshotCache.load(
+          user.id,
+          async () => {
+            const r = await fetch('/api/data', { cache: 'no-store' });
+            if (r.status === 401) {
+              snapshotCache.clear();
+              router.replace('/login');
+              router.refresh();
+              throw Error('请重新登录');
+            }
+            const j = await r.json();
+            if (!r.ok) throw Error(j.error);
+            return j as Snapshot;
+          },
+          force,
+        );
+        setData(value);
+        setError('');
+      } catch (e) {
+        setError((e as Error).message);
       }
-      const j = await r.json();
-      if (!r.ok) throw Error(j.error);
-      setData(j);
-      setError('');
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, [router]);
+    },
+    [router, user.id],
+  );
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- load updates state only after the asynchronous network response.
-    void load();
+    void load(false);
     if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production')
       navigator.serviceWorker.register('/sw.js').catch(() => {});
   }, [load]);
@@ -93,6 +106,19 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
     const interval = setInterval(() => void load(), 2500);
     return () => clearInterval(interval);
   }, [data, load]);
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const timer = window.setInterval(refresh, 30_000);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+      window.clearInterval(timer);
+    };
+  }, [load]);
   const notify = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(''), 4000);
@@ -1241,6 +1267,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'logout' }),
               });
+              snapshotCache.clear();
               router.replace('/login');
               router.refresh();
             }}
@@ -1321,7 +1348,7 @@ export default function Cabinet({ user }: { user: { name: string; role: string }
           {error ? (
             <div className="empty">
               <p className="error">{error}</p>
-              <button onClick={load}>
+              <button onClick={() => void load()}>
                 <RefreshCw size={16} /> 重试
               </button>
             </div>

@@ -16,7 +16,7 @@ export default async function Page({
   return (
     <Cabinet
       key={(route.path ?? []).join('/') + JSON.stringify(query)}
-      user={{ name: user.name, role: user.role }}
+      user={{ id: user.id, name: user.name, role: user.role }}
     />
   );
 }
