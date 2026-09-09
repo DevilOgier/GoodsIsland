@@ -2438,3 +2438,16 @@ input::placeholder {
   gap: 8px;
   margin-bottom: 12px;
 }
+
+/* Keep touch scrolling while disabling page pinch and double-tap zoom. */
+html,
+body {
+  touch-action: pan-x pan-y;
+}
+@media (hover: none) and (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
