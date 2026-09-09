@@ -7,6 +7,12 @@ image="${1:?Expected immutable image reference}"
 [[ "$image" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]] || { echo 'Invalid image'; exit 1; }
 [[ -f .env ]] || { echo 'Configure /opt/goods-island/.env first'; exit 1; }
 chmod 600 .env
+if [[ -n "${2:-}" ]]; then
+  export DOCKER_CONFIG
+  DOCKER_CONFIG=$(mktemp -d /opt/goods-island/.registry.XXXXXX)
+  trap 'rm -f "$DOCKER_CONFIG/config.json"; rmdir "$DOCKER_CONFIG"' EXIT
+  docker login ghcr.io --username "$2" --password-stdin
+fi
 previous=$(cat .current-image 2>/dev/null || true)
 export APP_IMAGE="$image"
 compose() { docker compose --env-file .env -f compose.yaml "$@"; }
