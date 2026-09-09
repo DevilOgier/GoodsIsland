@@ -1,6 +1,6 @@
 # 本机发布 → 腾讯云自动部署
 
-已提供代码和脚本。尚未配置真实服务器，不能把脚本校验视为云端部署验收。默认 Linux x86_64、Docker Engine + Compose v2、PostgreSQL 18、S3 兼容对象存储。构建在 GitHub Runner 完成，轻量服务器只拉镜像并运行。
+已提供代码和脚本。尚未配置真实服务器，不能把脚本校验视为云端部署验收。默认 Linux x86_64、Docker Engine + Compose v2、PostgreSQL 18、持久化磁盘图片存储（可切换 S3）。构建在 GitHub Runner 完成，轻量服务器只拉镜像并运行。
 
 ## 流程
 
@@ -12,7 +12,7 @@
 
 1. 准备 Linux x86_64 系统，安装 Docker Engine、Compose v2（支持 --wait）、curl 和 util-linux（flock）。用拥有 Docker 权限的部署用户运行；Docker 权限等同于服务器管理权限。
 2. 创建 /opt/goods-island 并赋予部署用户读写权限。将 deploy/server.env.example 复制为该目录的 .env，填入实际配置并 chmod 600。数据库密码在 POSTGRES_PASSWORD 和 DATABASE_URL 中保持一致；URL 中的特殊字符要编码。
-3. 使用真实私有 S3 兼容对象存储，配置域名、region、访问密钥及桶名。若使用腾讯云 COS，按该桶的 S3 兼容配置填写；图片上传 CORS 允许 APP_URL 的 PUT、GET、HEAD 和 Content-Type。不要在线上使用开发 S3RVER 凭证。
+3. 默认 STORAGE_DRIVER=filesystem，图片保存在 image-data 持久卷，web 和 worker 共享 /app/data/objects；不需要额外购买 COS。切换为 STORAGE_DRIVER=s3 时，使用真实私有 S3 兼容对象存储，配置域名、region、访问密钥及桶名。若使用腾讯云 COS，按该桶的 S3 兼容配置填写；图片上传 CORS 允许 APP_URL 的 PUT、GET、HEAD 和 Content-Type。不要在线上使用开发 S3RVER 凭证。
 4. 有域名：APP_URL=https://域名，SITE_ADDRESS=域名，COOKIE_SECURE=true，将域名解析到服务器，放行 80/443（以及用于部署的 SSH 端口）。Caddy 自动申请 HTTPS。暂无域名：APP_URL=http://服务器IP，SITE_ADDRESS=http://服务器IP，COOKIE_SECURE=false；之后改成 HTTPS 配置。应用 3000 只绑定服务器回环地址，数据库不对公网开放。
 5. GHCR 私有镜像需在部署用户下执行 docker login ghcr.io，使用仅含 read:packages 的凭证；勿把 token 写进命令行或代码。若机房无法访问 GHCR，需先解决出站网络，或后续改用腾讯云镜像仓库并修改脚本允许的镜像地址。
 6. 将部署公钥加入该用户的 ~/.ssh/authorized_keys。核对服务器 SSH 主机指纹后，将对应 known_hosts 内容保存到 GitHub Secret。不要通过关闭 StrictHostKeyChecking 绕过验证。
@@ -50,8 +50,8 @@
 - 通过镜像摘要部署，避免同名标签变动。
 - 串行发布，并在服务器使用 flock 防止并发更新。
 - 先拉镜像，暂停应用和 worker 的写入，再备份 PostgreSQL，执行 migration 和 seed，启动新版本并检查 /api/health。
-- PostgreSQL 使用持久卷，对象保存在独立 S3 桶；不会删除数据卷或覆盖 .env 中的密码。
-- 备份位于 /opt/goods-island/backups，需要自行设置异地备份和保留周期。
+- PostgreSQL 使用持久卷，图片使用 image-data 持久卷（或所配置的 S3 桶）；不会删除数据卷或覆盖 .env 中的密码。
+- 磁盘模式同时备份图片压缩包；S3 模式需单独配置桶备份。备份位于 /opt/goods-island/backups，需要自行设置异地备份和保留周期。
 - 失败时尝试重启上次应用镜像，但不会自动倒退数据库迁移。生产迁移应保持向后兼容；破坏性迁移失败需人工核对备份与恢复策略。此流程有短暂停机，不宣称零停机。
 - 没有真实服务器时不要发布版本标签来假装联调完成；先完成服务器初始化。
 

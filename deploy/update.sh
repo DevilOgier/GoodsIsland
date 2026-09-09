@@ -29,6 +29,8 @@ chmod 700 backups
 backup="backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ).dump"
 compose exec -T db pg_dump -U guzi -Fc guzi > "$backup"
 chmod 600 "$backup"
+compose run --rm --no-deps web sh -c 'if [ "$STORAGE_DRIVER" = filesystem ]; then tar -C "$STORAGE_LOCAL_DIR" -czf - .; fi' > "$backup.images.tar.gz"
+chmod 600 "$backup.images.tar.gz"
 compose run --rm --no-deps web node node_modules/prisma/build/index.js migrate deploy
 compose run --rm --no-deps web node --import tsx prisma/seed.ts
 compose up -d --wait web worker proxy

@@ -1,3 +1,4 @@
+import { readDiskObject, putDiskObject } from './disk-storage';
 import {
   S3Client,
   GetObjectCommand,
@@ -22,6 +23,7 @@ export async function uploadUrl(key: string, mime: string) {
   });
 }
 export async function readObject(key: string) {
+  if (process.env.STORAGE_DRIVER === 'filesystem') return readDiskObject(key);
   const head = await s3.send(new HeadObjectCommand({ Bucket, Key: key }));
   if (!head.ContentLength || head.ContentLength > 40 * 1024 * 1024)
     throw Error('图片大小不符合限制');
@@ -29,5 +31,6 @@ export async function readObject(key: string) {
   return Buffer.from(await response.Body!.transformToByteArray());
 }
 export async function putObject(key: string, bytes: Buffer, mime: string) {
+  if (process.env.STORAGE_DRIVER === 'filesystem') return putDiskObject(key, bytes);
   await s3.send(new PutObjectCommand({ Bucket, Key: key, Body: bytes, ContentType: mime }));
 }

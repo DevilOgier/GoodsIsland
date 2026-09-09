@@ -16,6 +16,7 @@ services:
   web:
     image: ${APP_IMAGE:?Set APP_IMAGE}
     env_file: .env
+    volumes: [image-data:/app/data/objects]
     environment:
       WEB_HOST: 0.0.0.0
       PORT: 3000
@@ -40,6 +41,7 @@ services:
     image: ${APP_IMAGE:?Set APP_IMAGE}
     command: [node, --import, tsx, src/workers/image-worker.ts]
     env_file: .env
+    volumes: [image-data:/app/data/objects]
     environment:
       LOCAL_SERVICES: 'false'
     restart: unless-stopped
@@ -58,6 +60,7 @@ services:
     depends_on:
       web: { condition: service_healthy }
 volumes:
+  image-data:
   postgres-data:
   caddy-data:
   caddy-config:

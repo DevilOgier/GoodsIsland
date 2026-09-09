@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 WEB_HOST=0.0.0.0 PORT=3000
 COPY --from=build --chown=node:node /app /app
+RUN mkdir -p /app/data/objects && chown -R node:node /app/data
 USER node
 EXPOSE 3000
 CMD ["node","scripts/web.mjs"]

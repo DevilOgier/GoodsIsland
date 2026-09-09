@@ -47,7 +47,7 @@ export async function createUpload(userId: string, productId: string, mime: stri
   return {
     id: intent.id,
     url:
-      process.env.LOCAL_SERVICES === 'true'
+      process.env.LOCAL_SERVICES === 'true' || process.env.STORAGE_DRIVER === 'filesystem'
         ? '/api/images/upload/' + intent.id
         : await uploadUrl(objectKey, mime),
   };
