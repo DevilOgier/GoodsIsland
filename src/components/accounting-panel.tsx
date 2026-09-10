@@ -229,6 +229,41 @@ export default function AccountingPanel({ data }: { data: Snapshot }) {
         </table>
         {!a.breakdown.length && <p className="empty">当前筛选下还没有收藏账目。</p>}
       </div>
+      <div className="account-breakdown-cards">
+        {a.breakdown.map((b) => (
+          <article className="mini-panel" key={b.id}>
+            <h3>{b.name}</h3>
+            <dl>
+              <div>
+                <dt>累计花费</dt>
+                <dd>{money(b.spent)}</dd>
+              </div>
+              <div>
+                <dt>已入库</dt>
+                <dd>{money(b.arrived)}</dd>
+              </div>
+              <div>
+                <dt>尚未到手</dt>
+                <dd>{money(b.pending)}</dd>
+              </div>
+              <div>
+                <dt>在手成本</dt>
+                <dd>{money(b.stock)}</dd>
+              </div>
+              <div>
+                <dt>卖出收入</dt>
+                <dd>{money(b.income)}</dd>
+              </div>
+              <div>
+                <dt>买入 / 卖出</dt>
+                <dd>
+                  {b.bought} / {b.sold}
+                </dd>
+              </div>
+            </dl>
+          </article>
+        ))}
+      </div>
       <h2>收支流水 · {a.rows.length} 笔</h2>
       <div className="account-ledger">
         {a.rows.map((r) => (

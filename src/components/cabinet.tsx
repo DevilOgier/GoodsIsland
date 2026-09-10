@@ -805,17 +805,36 @@ export default function Cabinet({
         </>
       );
     } else if (path === '/purchases')
-      content = purchasesList(
-        data.purchases.filter(
-          (p) =>
-            matches(p.productId) &&
-            (!status ||
-              (status === 'IN_TRANSIT'
-                ? ['PENDING', 'SHIPPED'].includes(p.arrivalStatus)
-                : p.arrivalStatus === status)),
-        ),
+      content = (
+        <>
+          <div className="page-intro">
+            <span className="eyebrow">PURCHASE STORIES</span>
+            <h1>买入记录</h1>
+            <p>记录每一份相遇，让喜欢都有迹可循。</p>
+          </div>
+          {purchasesList(
+            data.purchases.filter(
+              (p) =>
+                matches(p.productId) &&
+                (!status ||
+                  (status === 'IN_TRANSIT'
+                    ? ['PENDING', 'SHIPPED'].includes(p.arrivalStatus)
+                    : p.arrivalStatus === status)),
+            ),
+          )}
+        </>
       );
-    else if (path === '/sales') content = salesList(data.sales.filter((s) => matches(s.productId)));
+    else if (path === '/sales')
+      content = (
+        <>
+          <div className="page-intro">
+            <span className="eyebrow">PASSED WITH LOVE</span>
+            <h1>卖出记录</h1>
+            <p>记下每一次成交，也记住喜欢去往了哪里。</p>
+          </div>
+          {salesList(data.sales.filter((s) => matches(s.productId)))}
+        </>
+      );
     else if (path === '/listings') {
       const entries = data.listings.filter(
         (l) => matches(l.inventory.productId) && (!status || l.status === status),
@@ -871,51 +890,61 @@ export default function Cabinet({
             (status === 'ACTIVE' ? ['WANTED', 'PARTIAL'].includes(w.status) : w.status === status)),
       );
       content = (
-        <CollectionGallery
-          heading="收物心愿"
-          extra={
-            <Link className="primary gallery-poster-link" href="/posters?source=wanted">
-              批量制作收物图
-            </Link>
-          }
-          items={entries.map((w) => ({
-            id: w.id,
-            product: productById(w.productId)!,
-            badge: statusNames[w.status],
-            summary: (
-              <>
-                <strong>{w.targetPrice ? price(w.targetPrice) : '价格可议'} / 件</strong>
-                <small>
-                  已收 {w.fulfilledQuantity} / 想收 {w.wantedQuantity} 件
-                </small>
-                <small>{w.notes}</small>
-              </>
-            ),
-            actions: !['FULFILLED', 'CANCELLED'].includes(w.status) ? (
-              <>
-                <Link className="small-btn" href={'/posters?source=wanted&id=' + w.id}>
-                  制作收物图
-                </Link>
-                <button
-                  className="small-btn"
-                  onClick={() =>
-                    setDialog({ type: 'purchase', productId: w.productId, wantedId: w.id })
-                  }
-                >
-                  记录买入
-                </button>
-                <button
-                  className="small-btn"
-                  onClick={() =>
-                    act('wanted.progress', { id: w.id, fulfilledQuantity: w.wantedQuantity })
-                  }
-                >
-                  仅标记收齐
-                </button>
-              </>
-            ) : undefined,
-          }))}
-        />
+        <>
+          <div className="page-intro">
+            <span className="eyebrow">MY WISH LIST</span>
+            <h1>收物心愿 🌸</h1>
+            <p>把还没遇见的喜欢，先轻轻记在这里。</p>
+          </div>
+          <CollectionGallery
+            heading="正在收"
+            extra={
+              <Link className="primary gallery-poster-link" href="/posters?source=wanted">
+                批量制作收物图
+              </Link>
+            }
+            items={entries.map((w) => ({
+              id: w.id,
+              product: productById(w.productId)!,
+              badge: statusNames[w.status],
+              summary: (
+                <>
+                  <strong>{w.targetPrice ? price(w.targetPrice) : '价格可议'} / 件</strong>
+                  <small>
+                    已收 {w.fulfilledQuantity} / 想收 {w.wantedQuantity} 件
+                  </small>
+                  <small className={`wanted-priority wanted-priority--${w.priority.toLowerCase()}`}>
+                    {w.priority === 'HIGH' ? '很想要' : w.priority === 'LOW' ? '随缘' : '普通'}
+                  </small>
+                  <small>{w.notes}</small>
+                </>
+              ),
+              actions: !['FULFILLED', 'CANCELLED'].includes(w.status) ? (
+                <>
+                  <Link className="small-btn" href={'/posters?source=wanted&id=' + w.id}>
+                    制作收物图
+                  </Link>
+                  <button
+                    className="small-btn"
+                    onClick={() =>
+                      setDialog({ type: 'purchase', productId: w.productId, wantedId: w.id })
+                    }
+                  >
+                    记录买入
+                  </button>
+                  <button
+                    className="small-btn"
+                    onClick={() =>
+                      act('wanted.progress', { id: w.id, fulfilledQuantity: w.wantedQuantity })
+                    }
+                  >
+                    仅标记收齐
+                  </button>
+                </>
+              ) : undefined,
+            }))}
+          />
+        </>
       );
     } else if (path === '/groups')
       content = (

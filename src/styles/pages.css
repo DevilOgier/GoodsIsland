@@ -121,3 +121,162 @@
     box-shadow: var(--shadow-sm);
   }
 }
+
+.channel-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.channel-options button {
+  min-height: 42px;
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font: inherit;
+  cursor: pointer;
+}
+.channel-options button[aria-pressed='true'] {
+  border-color: rgb(100 118 83 / 35%);
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  box-shadow: inset 0 0 0 1px rgb(100 118 83 / 12%);
+  font-weight: 600;
+}
+.modal-backdrop.action-form-backdrop--purchase,
+.modal-backdrop.action-form-backdrop--purchaseEdit,
+.modal-backdrop.action-form-backdrop--sale,
+.modal-backdrop.action-form-backdrop--wanted {
+  justify-content: flex-end;
+  padding: 0;
+}
+.modal.action-form--purchase,
+.modal.action-form--purchaseEdit,
+.modal.action-form--sale,
+.modal.action-form--wanted {
+  width: min(480px, 100vw);
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+  padding: 0 26px 26px;
+  background: var(--color-surface);
+  animation: transaction-drawer-in var(--motion-sheet) ease-out;
+}
+.modal.action-form > header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  margin: 0 -26px 22px;
+  padding: 22px 26px 16px;
+  border-bottom: 1px solid var(--color-line);
+  background: rgb(255 254 250 / 96%);
+  backdrop-filter: blur(12px);
+}
+.action-form .chosen-product {
+  grid-column: 1 / -1;
+}
+.action-form .chosen-product > button {
+  min-height: 92px;
+}
+.action-form .channel-options {
+  grid-column: 1 / -1;
+}
+.modal.action-form form > footer {
+  position: sticky;
+  bottom: -26px;
+  margin: 24px -26px -26px;
+  padding: 14px 26px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-line);
+  background: rgb(255 254 250 / 96%);
+  backdrop-filter: blur(12px);
+}
+.wanted-priority {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-soft);
+}
+.wanted-priority--high {
+  color: var(--color-pink);
+  background: var(--color-pink-soft);
+}
+.wanted-priority--low {
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+.account-breakdown-cards {
+  display: none;
+}
+@keyframes transaction-drawer-in {
+  from {
+    opacity: 0.75;
+    transform: translateX(24px);
+  }
+}
+
+@media (max-width: 840px) {
+  .modal.action-form--purchase,
+  .modal.action-form--purchaseEdit,
+  .modal.action-form--sale,
+  .modal.action-form--wanted {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding-inline: 18px;
+    animation: transaction-page-in var(--motion-sheet) ease-out;
+  }
+  .modal.action-form > header {
+    margin-inline: -18px;
+    padding-inline: 18px;
+  }
+  .modal.action-form form > footer {
+    margin-inline: -18px;
+    padding-inline: 18px;
+  }
+  .channel-options {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .account-table {
+    display: none;
+  }
+  .account-breakdown-cards {
+    display: grid;
+    gap: 10px;
+  }
+  .account-breakdown-cards article {
+    display: grid;
+    gap: 14px;
+  }
+  .account-breakdown-cards dl {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .account-breakdown-cards dl div {
+    min-width: 0;
+  }
+  .account-breakdown-cards dt {
+    color: var(--color-text-muted);
+    font-size: var(--text-xs);
+  }
+  .account-breakdown-cards dd {
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    color: var(--color-text);
+    font-size: var(--text-sm);
+    font-weight: 600;
+  }
+  .channel-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@keyframes transaction-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}

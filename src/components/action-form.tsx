@@ -4,6 +4,7 @@ import { X, Images } from 'lucide-react';
 import ProductPicker from './product-picker';
 import ProductArt from './product-art';
 import ProductEditor from './product-editor';
+import { PurchaseChannelPicker } from './purchase/purchase-channel-picker';
 import type { Snapshot } from './types';
 import { typeNames } from './types';
 export type Dialog = { type: string; id?: string; productId?: string; wantedId?: string };
@@ -289,12 +290,17 @@ export default function ActionForm({
   }
   return (
     <div
-      className="modal-backdrop"
+      className={`modal-backdrop action-form-backdrop action-form-backdrop--${dialog.type}`}
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
-      <section className="modal" role="dialog" aria-modal="true" aria-label={title}>
+      <section
+        className={`modal action-form action-form--${dialog.type}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
         <header>
           <div>
             <span className="eyebrow">A NEW LITTLE STORY</span>
@@ -405,7 +411,14 @@ export default function ActionForm({
               ) : (
                 <label key={f.name}>
                   {f.label}
-                  {f.options ? (
+                  {f.name === 'purchaseChannel' ? (
+                    <PurchaseChannelPicker
+                      value={channel}
+                      options={f.options ?? []}
+                      disabled={!!linkedItem}
+                      onChange={setChannel}
+                    />
+                  ) : f.options ? (
                     <select
                       aria-label={f.label}
                       name={f.name}

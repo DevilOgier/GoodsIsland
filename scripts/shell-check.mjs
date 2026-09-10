@@ -44,7 +44,10 @@ try {
     '/products',
     '/inventory',
     '/purchases',
+    '/sales',
+    '/accounting',
     '/groups',
+    '/wanted',
     '/posters',
     '/admin',
     '/me',
@@ -93,7 +96,15 @@ try {
   const quickSheet = page.getByRole('dialog', { name: '快速记录' });
   await quickSheet.waitFor();
   await quickSheet.getByRole('button', { name: /记录买入/ }).click();
-  await page.locator('.modal-backdrop .modal').waitFor();
+  const mobilePurchaseForm = page.locator('.action-form--purchase');
+  await mobilePurchaseForm.waitFor();
+  const mobileFormBox = await mobilePurchaseForm.boundingBox();
+  if (!mobileFormBox || mobileFormBox.x > 1 || Math.abs(mobileFormBox.width - 390) > 1) {
+    throw Error('Purchase form is not full-screen on mobile');
+  }
+  if ((await mobilePurchaseForm.locator('.channel-options button').count()) !== 7) {
+    throw Error('Purchase channel picker is incomplete');
+  }
   await page.keyboard.press('Escape');
   await page.screenshot({ path: '.local/screenshots/shell-mobile-390.png', fullPage: true });
 
@@ -110,8 +121,24 @@ try {
     await page.getByRole('button', { name: '列表模式' }).click();
     await page.locator('.collection-items.list').waitFor();
   }
+  await page.goto('http://localhost:3000/accounting', { waitUntil: 'networkidle' });
+  if (await page.locator('.account-table').isVisible())
+    throw Error('Accounting table remains visible on mobile');
 
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('http://localhost:3000/purchases', { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: '添加' }).click();
+  const desktopPurchaseForm = page.locator('.action-form--purchase');
+  await page.waitForTimeout(300);
+  const desktopFormBox = await desktopPurchaseForm.boundingBox();
+  if (
+    !desktopFormBox ||
+    desktopFormBox.width > 481 ||
+    Math.abs(desktopFormBox.x + desktopFormBox.width - 1440) > 1
+  ) {
+    throw Error(`Purchase form is not a right-side desktop drawer: ${JSON.stringify(desktopFormBox)}`);
+  }
+  await desktopPurchaseForm.getByRole('button', { name: '关闭' }).click();
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
   const product = await db.product.findFirst();
   if (product) {
@@ -140,6 +167,9 @@ try {
       'Dashboard greeting',
       'Inventory stats',
       'three Catalog views',
+      'transaction drawer and mobile form',
+      'purchase channel picker',
+      'mobile accounting cards',
       'global search',
       'viewport lock',
       'PWA manifest',
@@ -147,7 +177,7 @@ try {
     errors,
   };
   writeFileSync('.local/shell-check.json', JSON.stringify(result, null, 2));
-  console.log('Shell browser checks: PASS (6 viewports, 8 routes, interactions, PWA)');
+  console.log('Shell browser checks: PASS (6 viewports, 11 routes, interactions, PWA)');
 } finally {
   await browser.close();
   await db.session.deleteMany({ where: { userId: user.id } });
