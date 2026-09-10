@@ -4,7 +4,16 @@ import { z } from 'zod';
 import { db } from '@/infrastructure/db';
 import { ensure, DomainError } from './errors';
 import { amount, quantity, productSchema } from './schemas';
-import { buy, sell, arrive, addFees, adjust, inventoryFor } from './inventory-service';
+import {
+  buy,
+  sell,
+  arrive,
+  addFees,
+  adjust,
+  inventoryFor,
+  updatePurchase,
+  deletePurchase,
+} from './inventory-service';
 type Tx = Prisma.TransactionClient;
 export async function command(
   user: { id: string; role: string },
@@ -42,6 +51,9 @@ async function dispatch(
 ): Promise<unknown> {
   const userId = user.id;
   if (op === 'purchase.create') return buy(tx, userId, raw);
+  if (op === 'purchase.update') return updatePurchase(tx, userId, raw);
+  if (op === 'purchase.delete')
+    return deletePurchase(tx, userId, z.object({ id: z.uuid() }).parse(raw).id);
   if (op === 'sale.create') return sell(tx, userId, raw);
   if (op === 'purchase.fees') return addFees(tx, userId, raw);
   if (op === 'inventory.adjust') return adjust(tx, userId, raw);

@@ -11,6 +11,7 @@ export type GalleryItem = {
   summary: React.ReactNode;
   actions?: React.ReactNode;
   details?: React.ReactNode;
+  quantity?: number;
 };
 export default function CollectionGallery({
   items,

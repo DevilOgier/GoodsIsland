@@ -31,14 +31,21 @@ export default function ActionForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [pickedId, setPickedId] = useState(dialog.productId ?? '');
+  const purchase = data.purchases.find((p) => p.id === dialog.id);
+  const [pickedId, setPickedId] = useState(dialog.productId ?? purchase?.productId ?? '');
   const [picking, setPicking] = useState(false);
   const linkedGroup =
     dialog.type === 'purchase' && dialog.id
       ? data.groups.find((g) => g.items.some((i) => i.id === dialog.id))
-      : undefined;
-  const linkedItem = linkedGroup?.items.find((i) => i.id === dialog.id);
-  const [channel, setChannel] = useState(linkedGroup ? '拼团' : '闲鱼');
+      : purchase
+        ? data.groups.find((g) => g.items.some((i) => i.purchase?.id === purchase.id))
+        : undefined;
+  const linkedItem = linkedGroup?.items.find(
+    (i) => i.id === dialog.id || i.purchase?.id === purchase?.id,
+  );
+  const [channel, setChannel] = useState(
+    purchase?.purchaseChannel ?? (linkedGroup ? '拼团' : '闲鱼'),
+  );
   const [groupChoice, setGroupChoice] = useState(linkedGroup?.id ?? '');
   const [itemChoice, setItemChoice] = useState('');
   const chosenGroup = data.groups.find((g) => g.id === groupChoice);
@@ -78,7 +85,6 @@ export default function ActionForm({
   let title = '',
     op = '',
     fields: Field[] = [];
-  const purchase = data.purchases.find((p) => p.id === dialog.id);
   switch (dialog.type) {
     case 'purchase':
       title = '记录一份新喜欢';
@@ -110,6 +116,50 @@ export default function ActionForm({
           min: '0',
         })),
         notes,
+      ];
+      break;
+    case 'purchaseEdit':
+      if (!purchase) break;
+      title = '修正买入记录';
+      op = 'purchase.update';
+      fields = [
+        { ...product, value: purchase.productId },
+        { ...qty, value: String(purchase.quantity) },
+        { ...unit, value: String(purchase.unitPrice) },
+        {
+          name: 'purchaseChannel',
+          label: '购买渠道',
+          value: purchase.purchaseChannel,
+          options: ['闲鱼', '拼团', '煤炉', '直播间', '淘宝', '线下', '其他'].map((v) => [v, v]),
+        },
+        {
+          name: 'purchaseDate',
+          label: '购买日期',
+          kind: 'date',
+          value: purchase.purchaseDate.slice(0, 10),
+        },
+        {
+          name: 'arrivalStatus',
+          label: '到货状态',
+          value: purchase.arrivalStatus,
+          options: [
+            ['PENDING', '待到货（暂不入库）'],
+            ['SHIPPED', '运输中'],
+            ['ARRIVED', '已经到货（计入库存）'],
+          ],
+        },
+        ...[
+          ['domesticShipping', '国内运费', purchase.domesticShipping],
+          ['internationalShipping', '国际运费', purchase.internationalShipping],
+          ['otherFee', '其他费用', purchase.otherFee],
+        ].map(([name, label, value]) => ({
+          name,
+          label: label + '（元）',
+          kind: 'number',
+          value: String(value),
+          min: '0',
+        })),
+        { ...notes, value: purchase.notes },
       ];
       break;
     case 'productType':
@@ -260,6 +310,9 @@ export default function ActionForm({
             元。补费会同步调整剩余库存成本与已售利润，历史记录保留。
           </p>
         )}
+        {dialog.type === 'purchaseEdit' && purchase?.adjustments.length ? (
+          <p className="notice">后续补录的费用会保留，并在修正后重新计算库存成本。</p>
+        ) : null}
         {dialog.type === 'listing' && (
           <p className="notice">挂出不会减少库存，只有确认成交才会扣减。</p>
         )}
@@ -274,6 +327,7 @@ export default function ActionForm({
               if (payload[k]) payload[k] = Number(payload[k]);
             if (!payload.parentId) delete payload.parentId;
             if (dialog.type === 'productEdit') payload.id = dialog.id;
+            if (dialog.type === 'purchaseEdit') payload.id = dialog.id;
             if (dialog.wantedId) {
               payload.wantedId = dialog.wantedId;
               payload.updateWanted = payload.updateWanted === 'on';
@@ -311,6 +365,9 @@ export default function ActionForm({
             }
           }}
         >
+          {dialog.type === 'purchaseEdit' && linkedItem && (
+            <input type="hidden" name="purchaseChannel" value="拼团" />
+          )}
           <div className="form-grid">
             {fields.map((f) =>
               f.name === 'productId' ? (
@@ -320,7 +377,13 @@ export default function ActionForm({
                   <button
                     type="button"
                     aria-label="从系列图鉴选择谷子"
-                    disabled={!!dialog.id && ['sale', 'purchase'].includes(dialog.type)}
+                    disabled={
+                      (!!dialog.id && ['sale', 'purchase'].includes(dialog.type)) ||
+                      (dialog.type === 'purchaseEdit' &&
+                        (purchase?.arrivalStatus === 'ARRIVED' ||
+                          !!purchase?.groupBuyItemId ||
+                          !!purchase?.wantedId))
+                    }
                     onClick={() => setPicking(true)}
                   >
                     {picked ? (

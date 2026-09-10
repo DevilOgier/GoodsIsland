@@ -25,6 +25,20 @@ export const purchaseSchema = z.object({
   updateWanted: z.boolean().default(false),
   notes: z.string().max(2000).default(''),
 });
+export const purchaseUpdateSchema = purchaseSchema
+  .pick({
+    productId: true,
+    quantity: true,
+    unitPrice: true,
+    domesticShipping: true,
+    internationalShipping: true,
+    otherFee: true,
+    purchaseChannel: true,
+    purchaseDate: true,
+    arrivalStatus: true,
+    notes: true,
+  })
+  .extend({ id: uuid });
 export const saleSchema = z.object({
   productId: uuid,
   quantity,

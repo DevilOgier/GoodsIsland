@@ -1,7 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { ensure } from './errors';
 import { allocated, decimal, money, replayCosts } from './money';
-import { purchaseSchema, saleSchema, feeSchema } from './schemas';
+import { purchaseSchema, purchaseUpdateSchema, saleSchema, feeSchema } from './schemas';
 import { z } from 'zod';
 type Tx = Prisma.TransactionClient;
 export async function inventoryFor(tx: Tx, userId: string, productId: string) {
@@ -123,6 +123,182 @@ export async function buy(tx: Tx, userId: string, raw: unknown) {
     },
   });
   return d.arrivalStatus === 'ARRIVED' ? arrive(tx, userId, p.id) : p;
+}
+async function rebuildInventory(tx: Tx, inventoryId: string) {
+  const inventory = await tx.inventory.findUnique({ where: { id: inventoryId } });
+  ensure(inventory, '库存不存在', 404);
+  const events = await tx.inventoryEvent.findMany({
+    where: { inventoryId, quantityDelta: { not: 0 } },
+    orderBy: { sequence: 'asc' },
+    include: { purchase: true },
+  });
+  let replay: ReturnType<typeof replayCosts> | undefined;
+  try {
+    replay = replayCosts(
+      events.map((event) => ({
+        id: event.id,
+        quantity: event.quantityDelta,
+        cost: event.costDelta.toFixed(2),
+        purchaseCost: event.purchase?.actualCost.toFixed(2),
+        saleId: event.saleId,
+      })),
+    );
+  } catch {
+    ensure(false, '这次修正会使历史出库时库存不足，请保留该买入记录或调整数量', 409);
+  }
+  const result = replay!;
+  const listed = await tx.saleListing.aggregate({
+    where: { inventoryId, status: 'ACTIVE' },
+    _sum: { remainingQuantity: true },
+  });
+  ensure(
+    result.quantity >= (listed._sum.remainingQuantity ?? 0),
+    '修改后库存不足以覆盖正在出物的数量，请先调整出物记录',
+    409,
+  );
+  await tx.saleCostAdjustment.deleteMany({ where: { revision: { inventoryId } } });
+  await tx.costRevision.deleteMany({ where: { inventoryId } });
+  await tx.inventoryEvent.deleteMany({ where: { inventoryId, quantityDelta: 0 } });
+  for (const outflow of result.outflows) {
+    await tx.inventoryEvent.update({
+      where: { id: outflow.eventId },
+      data: { costDelta: money(outflow.cost).negated() },
+    });
+    if (outflow.saleId)
+      await tx.sale.update({
+        where: { id: outflow.saleId },
+        data: { allocatedActualCost: outflow.cost },
+      });
+  }
+  await tx.inventory.update({
+    where: { id: inventoryId },
+    data: {
+      currentQuantity: result.quantity,
+      currentCost: result.cost,
+      version: { increment: 1 },
+    },
+  });
+  return result;
+}
+async function updateWantedContribution(
+  tx: Tx,
+  userId: string,
+  purchase: {
+    wantedId: string | null;
+    updateWanted: boolean;
+    quantity: number;
+    arrivalStatus: string;
+  },
+  nextQuantity: number,
+  nextStatus: string,
+) {
+  if (!purchase.wantedId || !purchase.updateWanted) return;
+  const wanted = await tx.wanted.findFirst({ where: { id: purchase.wantedId, userId } });
+  if (!wanted) return;
+  const previous = purchase.arrivalStatus === 'ARRIVED' ? purchase.quantity : 0;
+  const next = nextStatus === 'ARRIVED' ? nextQuantity : 0;
+  const fulfilled = wanted.fulfilledQuantity - previous + next;
+  ensure(fulfilled >= 0 && fulfilled <= wanted.wantedQuantity, '修改后收物进度超出目标数量', 409);
+  await tx.wanted.update({
+    where: { id: wanted.id },
+    data: {
+      fulfilledQuantity: fulfilled,
+      status:
+        fulfilled === wanted.wantedQuantity ? 'FULFILLED' : fulfilled > 0 ? 'PARTIAL' : 'WANTED',
+    },
+  });
+}
+export async function updatePurchase(tx: Tx, userId: string, raw: unknown) {
+  const d = purchaseUpdateSchema.parse(raw);
+  const purchase = await tx.purchase.findFirst({
+    where: { id: d.id, userId },
+    include: { adjustments: true, event: true, groupBuyItem: true },
+  });
+  ensure(purchase, '购买记录不存在', 404);
+  ensure(purchase.arrivalStatus !== 'CANCELLED', '已取消的购买请直接删除后重新记录', 409);
+  ensure(
+    purchase.productId === d.productId || purchase.arrivalStatus !== 'ARRIVED',
+    '已入库记录不能更换谷子，请删除后重新记录',
+    409,
+  );
+  ensure(
+    (!purchase.groupBuyItem && !purchase.wantedId) || purchase.productId === d.productId,
+    '关联拼团或收物目标的记录不能更换谷子',
+    409,
+  );
+  ensure(!purchase.groupBuyItem || d.purchaseChannel === '拼团', '拼团购入的渠道必须保留为拼团');
+  const product = await tx.product.findFirst({ where: { id: d.productId, status: 'ACTIVE' } });
+  ensure(product, '商品不存在或已归档');
+  const adjustmentTotal = purchase.adjustments.reduce(
+    (sum, item) => sum.add(item.amount),
+    money(0),
+  );
+  const productAmount = money(decimal(d.unitPrice).mul(d.quantity));
+  const actualCost = productAmount
+    .add(d.domesticShipping)
+    .add(d.internationalShipping)
+    .add(d.otherFee)
+    .add(adjustmentTotal);
+  if (purchase.arrivalStatus === 'ARRIVED')
+    await updateWantedContribution(tx, userId, purchase, d.quantity, d.arrivalStatus);
+  await tx.purchase.update({
+    where: { id: purchase.id },
+    data: {
+      productId: d.productId,
+      quantity: d.quantity,
+      unitPrice: d.unitPrice,
+      productAmount,
+      domesticShipping: d.domesticShipping,
+      internationalShipping: d.internationalShipping,
+      otherFee: d.otherFee,
+      actualCost,
+      purchaseChannel: d.purchaseChannel,
+      purchaseDate: new Date(d.purchaseDate),
+      arrivalStatus: d.arrivalStatus === 'ARRIVED' ? purchase.arrivalStatus : d.arrivalStatus,
+      arrivedAt: d.arrivalStatus === 'ARRIVED' ? purchase.arrivedAt : null,
+      notes: d.notes,
+    },
+  });
+  if (purchase.groupBuyItem)
+    await tx.groupBuyItem.update({
+      where: { id: purchase.groupBuyItem.id },
+      data: { quantity: d.quantity, unitPrice: d.unitPrice },
+    });
+  if (purchase.event && d.arrivalStatus !== 'ARRIVED') {
+    await tx.inventoryEvent.delete({ where: { id: purchase.event.id } });
+    await rebuildInventory(tx, purchase.event.inventoryId);
+  } else if (purchase.event) {
+    await tx.inventoryEvent.update({
+      where: { id: purchase.event.id },
+      data: { quantityDelta: d.quantity, costDelta: actualCost },
+    });
+    await rebuildInventory(tx, purchase.event.inventoryId);
+  } else if (d.arrivalStatus === 'ARRIVED') {
+    await arrive(tx, userId, purchase.id);
+  }
+  return tx.purchase.findUnique({ where: { id: purchase.id } });
+}
+export async function deletePurchase(tx: Tx, userId: string, id: string) {
+  const purchase = await tx.purchase.findFirst({
+    where: { id, userId },
+    include: { event: true },
+  });
+  ensure(purchase, '购买记录不存在', 404);
+  await updateWantedContribution(tx, userId, purchase, 0, 'PENDING');
+  if (purchase.event) await tx.inventoryEvent.delete({ where: { id: purchase.event.id } });
+  const revisions = await tx.costRevision.findMany({
+    where: { feeAdjustment: { purchaseId: purchase.id } },
+    select: { id: true },
+  });
+  const revisionIds = revisions.map((revision) => revision.id);
+  if (revisionIds.length) {
+    await tx.saleCostAdjustment.deleteMany({ where: { revisionId: { in: revisionIds } } });
+    await tx.costRevision.deleteMany({ where: { id: { in: revisionIds } } });
+  }
+  await tx.feeAdjustment.deleteMany({ where: { purchaseId: purchase.id } });
+  await tx.purchase.delete({ where: { id: purchase.id } });
+  if (purchase.event) await rebuildInventory(tx, purchase.event.inventoryId);
+  return { id };
 }
 export async function sell(tx: Tx, userId: string, raw: unknown) {
   const d = saleSchema.parse(raw);

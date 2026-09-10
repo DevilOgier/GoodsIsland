@@ -37,6 +37,8 @@ import type { Dialog } from './action-form';
 import PosterEditor from './poster-editor';
 import CollectionGallery from './collection-gallery';
 import AccountingPanel from './accounting-panel';
+import AccountPanel from './account-panel';
+import CatalogBrowser from './catalog-browser';
 const nav = [
   ['/', '我的小岛', LayoutDashboard],
   ['/products', '谷子图鉴', BookOpen],
@@ -50,7 +52,11 @@ const nav = [
   ['/posters', '海报工坊', Palette],
   ['/admin', '图鉴管理', Settings],
 ] as const;
-export default function Cabinet({ user }: { user: { id: string; name: string; role: string } }) {
+export default function Cabinet({
+  user,
+}: {
+  user: { id: string; name: string; email: string; role: string };
+}) {
   const router = useRouter();
   const path = usePathname();
   const searchParams = useSearchParams();
@@ -66,7 +72,6 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
   const [tag, setTag] = useState('');
   const [type, setType] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
-  const [page, setPage] = useState(1);
   const [imageBusy, setImageBusy] = useState(false);
   const load = useCallback(
     async (force = true) => {
@@ -123,6 +128,16 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
     setToast(message);
     setTimeout(() => setToast(''), 4000);
   };
+  const logout = async () => {
+    await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'logout' }),
+    });
+    snapshotCache.clear();
+    router.replace('/login');
+    router.refresh();
+  };
   const save = async (op: string, payload: Record<string, unknown>) => {
     const r = await fetch('/api/commands', {
       method: 'POST',
@@ -157,6 +172,10 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
       : '';
     if (!window.confirm(`确定永久删除「${name}」${scope}吗？此操作不能撤销。`)) return;
     await act('catalog.delete', { entity, id });
+  };
+  const removePurchase = async (id: string, name: string) => {
+    if (!window.confirm(`确定删除「${name}」的这条买入记录吗？库存和成本会同步重算。`)) return;
+    await act('purchase.delete', { id });
   };
   const imageAction = async (action: string, id: string, source?: string) => {
     setImageBusy(true);
@@ -215,7 +234,7 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
     ? data?.groups.find((g) => g.id === path.split('/')[2])
     : undefined;
   const section =
-    nav.find((n) => n[0] === path)?.[1] ??
+    (path === '/me' ? '我的账号' : nav.find((n) => n[0] === path)?.[1]) ??
     (selected ? '谷子详情' : groupDetail ? '拼团详情' : '我的小岛');
   const all = data?.products ?? [];
   const filtered = all.filter(
@@ -342,6 +361,14 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
                   </>
                 )}
                 {p.arrivalStatus !== 'CANCELLED' && actionButton('fees', '补运费', p.id)}
+                {p.arrivalStatus !== 'CANCELLED' &&
+                  actionButton('purchaseEdit', '修改', p.id, p.productId)}
+                <button
+                  className="small-btn danger"
+                  onClick={() => void removePurchase(p.id, productById(p.productId)!.name)}
+                >
+                  <Trash2 size={14} /> 删除
+                </button>
               </>
             ),
             details: (
@@ -681,9 +708,10 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
             </p>
           </div>
           {list.length ? (
-            <CollectionGallery
+            <CatalogBrowser
               heading={path === '/inventory' ? '我的收藏' : '谷子图鉴'}
-              items={list.slice((page - 1) * 12, page * 12).map((p) => ({
+              inventory={path === '/inventory'}
+              items={list.map((p) => ({
                 id: p.id,
                 product: p,
                 badge: p.typeDefinition.name,
@@ -711,6 +739,7 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
                     记录买入
                   </button>
                 ),
+                quantity: invFor(p.id)?.currentQuantity ?? 0,
               }))}
             />
           ) : (
@@ -718,17 +747,6 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
               setDialog({ type: path === '/inventory' ? 'purchase' : 'product' }),
             )
           )}
-          <div className="pagination">
-            <button disabled={page === 1} onClick={() => setPage(page - 1)}>
-              上一页
-            </button>
-            <span>
-              {page} / {Math.max(1, Math.ceil(list.length / 12))}
-            </span>
-            <button disabled={page * 12 >= list.length} onClick={() => setPage(page + 1)}>
-              下一页
-            </button>
-          </div>
         </>
       );
     } else if (path === '/purchases')
@@ -1192,6 +1210,7 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
           </section>
         </>
       );
+    else if (path === '/me') content = <AccountPanel user={user} onLogout={logout} />;
     else if (['/ips', '/characters', '/series'].includes(path))
       content = (
         <>
@@ -1261,16 +1280,8 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
           <button
             className="icon-btn"
             aria-label="退出登录"
-            onClick={async () => {
-              await fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'logout' }),
-              });
-              snapshotCache.clear();
-              router.replace('/login');
-              router.refresh();
-            }}
+            title="退出或切换账号"
+            onClick={() => void logout()}
           >
             <LogOut size={16} />
           </button>
@@ -1294,7 +1305,8 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
             !selected &&
             !groupDetail &&
             !path.startsWith('/posters') &&
-            path !== '/accounting' && (
+            path !== '/accounting' &&
+            path !== '/me' && (
               <div className="toolbar">
                 <h2>{section}</h2>
                 <div className="toolbar-controls">
@@ -1306,7 +1318,6 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
                       value={q}
                       onChange={(e) => {
                         setQ(e.target.value);
-                        setPage(1);
                       }}
                     />
                   </div>
@@ -1428,7 +1439,6 @@ export default function Cabinet({ user }: { user: { id: string; name: string; ro
                     value={String(value)}
                     onChange={(e) => {
                       (setter as (v: string) => void)(e.target.value);
-                      setPage(1);
                     }}
                   >
                     <option value="">全部</option>

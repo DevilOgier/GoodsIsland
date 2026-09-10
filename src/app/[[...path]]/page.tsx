@@ -13,10 +13,11 @@ export default async function Page({
   const query = await searchParams;
   const user = await currentUser();
   if (!user) redirect('/login');
+  if (route.path?.[0] === 'admin' && user.role !== 'ADMIN') redirect('/');
   return (
     <Cabinet
       key={(route.path ?? []).join('/') + JSON.stringify(query)}
-      user={{ id: user.id, name: user.name, role: user.role }}
+      user={{ id: user.id, name: user.name, email: user.email, role: user.role }}
     />
   );
 }

@@ -40,21 +40,21 @@ flowchart TB
 |路由|功能|
 |---|---|
 |`/`|收藏概览：在手总数、商品种类、最近买入/卖出、在途、待排发、正在收/出|
-|`/login`|单账号登录，安全 Session|
+|`/login`|多账号登录，安全 Session；管理员创建个人收藏账号|
 |`/ips`|IP 图鉴入口|
 |`/characters?ipId=`|角色列表|
 |`/series?characterId=`|系列列表|
-|`/products`|商品图鉴，关键词、Tag、IP、角色、系列、类型筛选|
+|`/products`|商品图鉴，支持全部周边、周边类型、周边系列三种粒度及多条件筛选|
 |`/products/[id]`|大图、层级、标签、描述、我的库存/交易/收物；原图增强对比|
-|`/inventory`|库存图卡/列表、平均成本、总成本、挂出、有货/无货筛选|
-|`/purchases`、`/purchases/new`、`/purchases/[id]`|买入、费用拆分、到货操作|
+|`/inventory`|收藏柜按全部、类型、系列浏览，支持图卡/列表、平均成本、总成本与挂出筛选|
+|`/purchases`、`/purchases/new`、`/purchases/[id]`|买入、修改/删除与库存成本重算、费用拆分、到货操作|
 |`/sales`、`/sales/new`|卖出历史与实际成交|
 |`/groups`、`/groups/new`、`/groups/[id]`|拼团及逐项支付/运输/到货/排发|
 |`/wanted`|想收数量、已收数量、心理价、状态及收物图入口|
 |`/listings`|正在出物/已完成，成交和出物图入口|
 |`/posters`、`/posters/new`、`/posters/[id]/edit`|海报工坊与编辑器|
 |`/transactions`|移动端买入/卖出统一入口|
-|`/me`|移动端拼团、收/出物、海报、设置和管理入口|
+|`/me`|当前账号、退出/切换、个人账号创建，以及移动端功能入口|
 |`/admin` 及 `/admin/{ips,characters,series,products,tags,templates}`|ADMIN 公共图鉴、图片、模板维护|
 
 路径统一使用小写 `/ips`，对应需求中的 `/IP`。桌面侧栏完整导航，移动底栏首页/图鉴/库存/交易/我的。触摸目标至少 44px，底部使用 safe-area-inset-bottom。筛选使用可关闭底部 Sheet，已选条件显示摘要，URL 保留筛选参数。

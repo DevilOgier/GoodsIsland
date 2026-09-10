@@ -1,6 +1,12 @@
 import { cookies } from 'next/headers';
 import { db } from '@/infrastructure/db';
-import { createSession, hashPassword, hashToken, verifyPassword } from '@/infrastructure/auth';
+import {
+  createSession,
+  hashPassword,
+  hashToken,
+  requireUser,
+  verifyPassword,
+} from '@/infrastructure/auth';
 import { ensure } from '@/domain/errors';
 import { fail, originGuard } from '@/lib/http';
 import { z } from 'zod';
@@ -10,7 +16,7 @@ export async function POST(request: Request) {
     originGuard(request);
     const d = z
       .object({
-        action: z.enum(['login', 'setup', 'logout']),
+        action: z.enum(['login', 'setup', 'logout', 'register']),
         email: z.email().optional(),
         password: z.string().min(10).max(128).optional(),
         name: z.string().min(1).max(50).optional(),
@@ -24,6 +30,20 @@ export async function POST(request: Request) {
     }
     ensure(d.email && d.password, '请填写邮箱和至少10位密码');
     const email = d.email.toLowerCase();
+    if (d.action === 'register') {
+      await requireUser(true);
+      ensure(d.name, '请填写收藏家昵称');
+      ensure(!(await db.user.findUnique({ where: { email } })), '这个邮箱已经有账号了', 409);
+      const user = await db.user.create({
+        data: {
+          email,
+          name: d.name,
+          passwordHash: hashPassword(d.password),
+          role: 'USER',
+        },
+      });
+      return Response.json({ id: user.id, name: user.name, email: user.email });
+    }
     const count = attempts.get(email);
     ensure(
       !count || count.until < Date.now() || count.count < 10,
