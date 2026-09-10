@@ -26,6 +26,8 @@ import {
   Upload,
   RefreshCw,
   Trash2,
+  CheckCircle2,
+  LoaderCircle,
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
 import { createSnapshotCache } from '@/lib/snapshot-cache';
@@ -63,6 +65,7 @@ export default function Cabinet({
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [pendingAction, setPendingAction] = useState('');
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState(false);
@@ -124,9 +127,25 @@ export default function Cabinet({
       window.clearInterval(timer);
     };
   }, [load]);
+  useEffect(() => {
+    const showTap = (event: PointerEvent) => {
+      const button = (event.target as Element | null)?.closest('button');
+      if (!button || button.disabled) return;
+      button.classList.remove('tap-feedback');
+      void button.offsetWidth;
+      button.classList.add('tap-feedback');
+      window.setTimeout(() => button.classList.remove('tap-feedback'), 620);
+    };
+    document.addEventListener('pointerdown', showTap);
+    return () => document.removeEventListener('pointerdown', showTap);
+  }, []);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(''), 4000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
   const notify = (message: string) => {
     setToast(message);
-    setTimeout(() => setToast(''), 4000);
   };
   const logout = async () => {
     await fetch('/api/auth', {
@@ -138,7 +157,11 @@ export default function Cabinet({
     router.replace('/login');
     router.refresh();
   };
-  const save = async (op: string, payload: Record<string, unknown>) => {
+  const save = async (
+    op: string,
+    payload: Record<string, unknown>,
+    successMessage = '已保存，收藏柜已更新',
+  ) => {
     const r = await fetch('/api/commands', {
       method: 'POST',
       headers: {
@@ -152,14 +175,23 @@ export default function Cabinet({
     const j = await r.json();
     if (!r.ok) throw Error(j.error);
     await load();
-    notify('已保存，收藏柜已更新');
+    notify(successMessage);
     return j;
   };
-  const act = async (op: string, payload: Record<string, unknown>) => {
+  const act = async (
+    op: string,
+    payload: Record<string, unknown>,
+    successMessage?: string,
+    actionKey = op,
+  ) => {
+    if (pendingAction) return;
+    setPendingAction(actionKey);
     try {
-      await save(op, payload);
+      await save(op, payload, successMessage);
     } catch (e) {
       notify((e as Error).message);
+    } finally {
+      setPendingAction('');
     }
   };
   const removeCatalog = async (
@@ -174,8 +206,13 @@ export default function Cabinet({
     await act('catalog.delete', { entity, id });
   };
   const removePurchase = async (id: string, name: string) => {
-    if (!window.confirm(`确定删除「${name}」的这条买入记录吗？库存和成本会同步重算。`)) return;
-    await act('purchase.delete', { id });
+    if (
+      !window.confirm(
+        `确定删除「${name}」的这条买入记录吗？库存和成本会同步重算；如果来自拼团，关联团项也会一起删除。`,
+      )
+    )
+      return;
+    await act('purchase.delete', { id }, '买入记录已删除，库存与关联拼团已同步');
   };
   const imageAction = async (action: string, id: string, source?: string) => {
     setImageBusy(true);
@@ -919,20 +956,46 @@ export default function Cabinet({
             <p>
               团长 · {groupDetail.groupOwner} / {statusNames[groupDetail.status]}
             </p>
+            <p className="group-sync-note">
+              登记购买会生成买入记录；确认到货后会增加收藏柜库存。删除买入记录时，对应团项也会一起删除。
+            </p>
             <div className="button-row">
-              {actionButton('groupItem', '添加团项', groupDetail.id)}
+              {groupDetail.status === 'OPEN' &&
+                actionButton('groupItem', '添加团项', groupDetail.id)}
               {groupDetail.status === 'OPEN' && (
                 <button
-                  onClick={() => act('group.status', { id: groupDetail.id, status: 'CLOSED' })}
+                  disabled={!!pendingAction}
+                  onClick={() =>
+                    act(
+                      'group.status',
+                      { id: groupDetail.id, status: 'CLOSED' },
+                      '已截团，团项仍可继续更新物流状态',
+                      `group:${groupDetail.id}:close`,
+                    )
+                  }
                 >
-                  截团
+                  {pendingAction === `group:${groupDetail.id}:close` && (
+                    <LoaderCircle className="button-spinner" size={15} />
+                  )}
+                  {pendingAction === `group:${groupDetail.id}:close` ? '截团中…' : '截团'}
                 </button>
               )}
               {groupDetail.status === 'CLOSED' && (
                 <button
-                  onClick={() => act('group.status', { id: groupDetail.id, status: 'COMPLETED' })}
+                  disabled={!!pendingAction}
+                  onClick={() =>
+                    act(
+                      'group.status',
+                      { id: groupDetail.id, status: 'COMPLETED' },
+                      '拼团已完成并保存',
+                      `group:${groupDetail.id}:complete`,
+                    )
+                  }
                 >
-                  完成拼团
+                  {pendingAction === `group:${groupDetail.id}:complete` && (
+                    <LoaderCircle className="button-spinner" size={15} />
+                  )}
+                  {pendingAction === `group:${groupDetail.id}:complete` ? '保存中…' : '完成拼团'}
                 </button>
               )}
             </div>
@@ -950,22 +1013,38 @@ export default function Cabinet({
                     ['paymentStatus', 'UNPAID', 'PAID', '未支付', '已支付'],
                     ['shippingStatus', 'NOT_SHIPPED', 'SHIPPED', '上游未发货', '上游已发货'],
                     ['dispatchStatus', 'NOT_DISPATCHED', 'DISPATCHED', '未排发', '已排发'],
-                  ].map(([field, off, on, offLabel, onLabel]) => (
-                    <button
-                      className={
-                        'small-btn ' + (i[field as keyof typeof i] === on ? 'selected' : '')
-                      }
-                      key={field}
-                      onClick={() =>
-                        act('group.item-status', {
-                          id: i.id,
-                          [field]: i[field as keyof typeof i] === on ? off : on,
-                        })
-                      }
-                    >
-                      {i[field as keyof typeof i] === on ? onLabel : offLabel}
-                    </button>
-                  ))}
+                  ].map(([field, off, on, offLabel, onLabel]) => {
+                    const enabled = i[field as keyof typeof i] === on;
+                    const actionKey = `group:${i.id}:${field}`;
+                    const nextLabel = enabled ? offLabel : onLabel;
+                    return (
+                      <button
+                        aria-pressed={enabled}
+                        className={`small-btn group-status-button ${enabled ? 'selected' : ''} ${
+                          pendingAction === actionKey ? 'action-pending' : ''
+                        }`}
+                        disabled={
+                          !!pendingAction || ['COMPLETED', 'CANCELLED'].includes(groupDetail.status)
+                        }
+                        key={field}
+                        onClick={() =>
+                          act(
+                            'group.item-status',
+                            { id: i.id, [field]: enabled ? off : on },
+                            `已更新为「${nextLabel}」`,
+                            actionKey,
+                          )
+                        }
+                      >
+                        {pendingAction === actionKey ? (
+                          <LoaderCircle className="button-spinner" size={14} />
+                        ) : enabled ? (
+                          <CheckCircle2 size={14} />
+                        ) : null}
+                        {pendingAction === actionKey ? '保存中…' : enabled ? onLabel : offLabel}
+                      </button>
+                    );
+                  })}
                 </div>
                 {i.purchase ? (
                   <>
@@ -973,14 +1052,25 @@ export default function Cabinet({
                     {!['ARRIVED', 'CANCELLED'].includes(i.purchase.arrivalStatus) && (
                       <button
                         className="small-btn"
-                        onClick={() => act('purchase.arrive', { id: i.purchase!.id })}
+                        disabled={!!pendingAction}
+                        onClick={() =>
+                          act(
+                            'purchase.arrive',
+                            { id: i.purchase!.id },
+                            '已确认到货，收藏柜库存已同步增加',
+                            `group:${i.id}:arrive`,
+                          )
+                        }
                       >
-                        本人确认到货
+                        {pendingAction === `group:${i.id}:arrive` && (
+                          <LoaderCircle className="button-spinner" size={14} />
+                        )}
+                        {pendingAction === `group:${i.id}:arrive` ? '入库中…' : '本人确认到货'}
                       </button>
                     )}
                   </>
                 ) : (
-                  actionButton('purchase', '登记购买', i.id, i.productId)
+                  actionButton('purchase', '登记购买并关联收藏', i.id, i.productId)
                 )}
               </article>
             ))}

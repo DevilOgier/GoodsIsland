@@ -297,6 +297,8 @@ export async function deletePurchase(tx: Tx, userId: string, id: string) {
   }
   await tx.feeAdjustment.deleteMany({ where: { purchaseId: purchase.id } });
   await tx.purchase.delete({ where: { id: purchase.id } });
+  if (purchase.groupBuyItemId)
+    await tx.groupBuyItem.deleteMany({ where: { id: purchase.groupBuyItemId } });
   if (purchase.event) await rebuildInventory(tx, purchase.event.inventoryId);
   return { id };
 }

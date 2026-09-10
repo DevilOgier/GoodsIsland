@@ -164,12 +164,14 @@ async function dispatch(
         dispatchStatus: z.enum(['NOT_DISPATCHED', 'DISPATCHED']).optional(),
       })
       .parse(raw);
-    ensure(
-      await tx.groupBuyItem.findFirst({ where: { id: d.id, group: { userId } } }),
-      '团项不存在',
-      404,
-    );
-    return tx.groupBuyItem.update({ where: { id: d.id }, data: d });
+    const item = await tx.groupBuyItem.findFirst({
+      where: { id: d.id, group: { userId } },
+      include: { group: true },
+    });
+    ensure(item, '团项不存在', 404);
+    ensure(!['COMPLETED', 'CANCELLED'].includes(item.group.status), '拼团已结束', 409);
+    const { id, ...status } = d;
+    return tx.groupBuyItem.update({ where: { id }, data: status });
   }
   if (op === 'group.status') {
     const d = z

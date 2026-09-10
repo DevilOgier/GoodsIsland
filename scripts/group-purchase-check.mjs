@@ -77,7 +77,27 @@ try {
     data: { groupId: group.id, productId: product.id, quantity: 2, unitPrice: '12' },
   });
   await page.goto('http://localhost:3000/groups/' + group.id);
-  await page.getByRole('button', { name: '登记购买' }).click();
+  const itemRow = page.locator('.record-list article.record').last();
+  const paymentButton = itemRow.getByRole('button', { name: '未支付', exact: true });
+  await paymentButton.dispatchEvent('pointerdown');
+  await expect(paymentButton).toHaveClass(/tap-feedback/);
+  await page.route('**/api/commands', async (route) => {
+    const body = route.request().postDataJSON();
+    if (body.operation === 'group.item-status')
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    await route.continue();
+  });
+  await paymentButton.click();
+  await expect(itemRow.locator('.group-status-button.action-pending')).toContainText('保存中');
+  await expect(itemRow.getByRole('button', { name: '已支付', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('status')).toContainText('已更新为「已支付」');
+  await page.unroute('**/api/commands');
+  if ((await db.groupBuyItem.findUniqueOrThrow({ where: { id: item.id } })).paymentStatus !== 'PAID')
+    throw Error('Group item status not persisted');
+  await itemRow.getByRole('button', { name: '登记购买并关联收藏', exact: true }).click();
   await expect(page.getByLabel('购买渠道', { exact: true })).toHaveValue('拼团');
   await expect(page.getByLabel('数量', { exact: true })).toHaveValue('2');
   await page.getByRole('button', { name: '确认保存' }).click();
@@ -86,7 +106,7 @@ try {
     throw Error('Existing group item not linked');
   if (errors.length) throw Error(errors.join('\n'));
   console.log(
-    'Group purchase browser: PASS (mobile new group, existing group, group tab purchase)',
+    'Group purchase browser: PASS (mobile linkage, persisted status, visible feedback)',
   );
 } finally {
   await browser.close();

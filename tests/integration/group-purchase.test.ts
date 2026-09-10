@@ -50,9 +50,35 @@ test('拼团购入：原子建团、已有团、已有团项、权限、回滚�
     const item = await db.groupBuyItem.create({
       data: { groupId: first.groupBuyId, productId: product.id, quantity: 2, unitPrice: '12' },
     });
+    await command(
+      user,
+      'group.item-status',
+      {
+        id: item.id,
+        paymentStatus: 'PAID',
+        shippingStatus: 'SHIPPED',
+        dispatchStatus: 'DISPATCHED',
+      },
+      randomUUID(),
+    );
+    const statusItem = await db.groupBuyItem.findUniqueOrThrow({ where: { id: item.id } });
+    assert.equal(statusItem.paymentStatus, 'PAID');
+    assert.equal(statusItem.shippingStatus, 'SHIPPED');
+    assert.equal(statusItem.dispatchStatus, 'DISPATCHED');
     await assert.rejects(send({ ...base, groupBuyItemId: item.id, quantity: 3 }), /数量/);
-    await send({ ...base, groupBuyItemId: item.id });
+    const linked = await send({ ...base, groupBuyItemId: item.id });
+    assert.equal(
+      (await db.inventory.findFirstOrThrow({ where: { userId: user.id } })).currentQuantity,
+      4,
+    );
     await assert.rejects(send({ ...base, groupBuyItemId: item.id }), /已关联/);
+    await command(user, 'purchase.delete', { id: linked.id }, randomUUID());
+    assert.equal(await db.groupBuyItem.count({ where: { id: item.id } }), 0);
+    assert.equal(await db.purchase.count({ where: { id: linked.id } }), 0);
+    assert.equal(
+      (await db.inventory.findFirstOrThrow({ where: { userId: user.id } })).currentQuantity,
+      2,
+    );
     await assert.rejects(
       send({ ...base, groupId: first.groupBuyId, newGroup: { name: '多余', groupOwner: '团长' } }),
       /一种/,
