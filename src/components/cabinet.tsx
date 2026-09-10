@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
 import { createSnapshotCache } from '@/lib/snapshot-cache';
+import { accounting, fixed, localDate } from '@/domain/accounting';
 const snapshotCache = createSnapshotCache<Snapshot>();
 import { price, statusNames } from './types';
 import ProductArt from './product-art';
@@ -442,6 +443,8 @@ export default function Cabinet({
   }
   let content: React.ReactNode = null;
   if (data) {
+    const currentMonth = localDate(new Date().toISOString()).slice(0, 7);
+    const monthAccounting = accounting(data, { month: currentMonth });
     const visible = filtered.filter((p) => p.status === 'ACTIVE');
     const owned = visible.filter(
       (p) =>
@@ -459,15 +462,11 @@ export default function Cabinet({
           <section className="hero">
             <div>
               <span className="eyebrow">MY LITTLE COLLECTION ISLAND</span>
-              <h1>
-                把每一份喜欢，
-                <br />
-                <em>好好收藏。</em>
-              </h1>
+              <h1>你好，{user.name} 🌷</h1>
               <p>
-                {user.name}，欢迎回到你的谷子小岛。
+                继续收集喜欢的吧。
                 <br />
-                在这里，记录每一次心动和相遇。
+                在谷屿，小小的谷子也能拼成闪闪发光的日常。
               </p>
               <button className="primary" onClick={() => setDialog({ type: 'purchase' })}>
                 收藏新的喜欢 <Plus size={17} />
@@ -499,9 +498,9 @@ export default function Cabinet({
               ],
               [
                 BookOpen,
-                '收藏种类',
-                data.inventory.filter((i) => i.currentQuantity > 0).length,
-                '种心动',
+                '本月支出',
+                '¥' + fixed(monthAccounting.expense),
+                currentMonth.replace('-', ' 年 ') + ' 月',
               ],
               [
                 Package,
@@ -513,9 +512,15 @@ export default function Cabinet({
               ],
               [
                 Heart,
-                '正在收物',
-                data.wanted.filter((w) => ['WANTED', 'PARTIAL'].includes(w.status)).length,
-                '份心愿',
+                '拼团待处理',
+                data.groups
+                  .flatMap((group) => group.items)
+                  .filter(
+                    (item) =>
+                      item.dispatchStatus === 'NOT_DISPATCHED' &&
+                      item.purchase?.arrivalStatus !== 'CANCELLED',
+                  ).length,
+                '项待跟进',
               ],
             ].map(([Icon, label, value, unit], i) => {
               const I = Icon as typeof Archive;
@@ -525,10 +530,10 @@ export default function Cabinet({
                   key={i}
                   href={
                     [
-                      '/inventory?status=stock',
+                      '/accounting',
                       '/inventory?status=stock',
                       '/purchases?status=IN_TRANSIT',
-                      '/wanted?status=ACTIVE',
+                      '/groups',
                     ][i]
                   }
                   aria-label={'查看' + String(label)}
@@ -714,13 +719,45 @@ export default function Cabinet({
             <span className="eyebrow">
               {path === '/inventory' ? 'YOUR OWN LITTLE TREASURES' : 'THE COLLECTION ENCYCLOPEDIA'}
             </span>
-            <h1>{path === '/inventory' ? '我的收藏柜' : '发现下一份心动'}</h1>
+            <h1>{path === '/inventory' ? '我的收藏柜 🌷' : '谷子图鉴 📖'}</h1>
             <p>
               {path === '/inventory'
-                ? '每一件谷子，都有属于它的故事。'
-                : '从角色到系列，让每一份喜欢都有迹可循。'}
+                ? '这些是我用热爱一点点收集起来的宝物。'
+                : '收录每一份心动的谷子。'}
             </p>
           </div>
+          {path === '/inventory' && (
+            <div className="inventory-overview-stats">
+              <article>
+                <span>总库存件数</span>
+                <strong>
+                  {data.inventory.reduce((sum, item) => sum + item.currentQuantity, 0)}
+                </strong>
+              </article>
+              <article>
+                <span>已到货记录</span>
+                <strong>
+                  {data.purchases
+                    .filter((item) => item.arrivalStatus === 'ARRIVED')
+                    .reduce((sum, item) => sum + item.quantity, 0)}
+                </strong>
+              </article>
+              <article>
+                <span>待到货</span>
+                <strong>
+                  {data.purchases
+                    .filter((item) => ['PENDING', 'SHIPPED'].includes(item.arrivalStatus))
+                    .reduce((sum, item) => sum + item.quantity, 0)}
+                </strong>
+              </article>
+              <article>
+                <span>当前库存投入</span>
+                <strong>
+                  {price(data.inventory.reduce((sum, item) => sum + Number(item.currentCost), 0))}
+                </strong>
+              </article>
+            </div>
+          )}
           {list.length ? (
             <CatalogBrowser
               heading={path === '/inventory' ? '我的收藏' : '谷子图鉴'}
@@ -731,7 +768,11 @@ export default function Cabinet({
                 badge: p.typeDefinition.name,
                 summary: (
                   <>
-                    <strong>{invFor(p.id)?.currentQuantity ?? 0} 件在手</strong>
+                    <strong>
+                      {invFor(p.id)?.currentQuantity
+                        ? `拥有 ×${invFor(p.id)!.currentQuantity}`
+                        : '未拥有'}
+                    </strong>
                     {path === '/inventory' && (
                       <small>
                         均价{' '}

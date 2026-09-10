@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { LayoutGrid, List, ImageIcon } from 'lucide-react';
+import { Grid2X2, Images, List, ImageIcon } from 'lucide-react';
 import type { Product } from './types';
 import ProductArt from './product-art';
 export type GalleryItem = {
@@ -17,29 +17,40 @@ export default function CollectionGallery({
   items,
   heading = '收藏一览',
   extra,
+  totalCount,
 }: {
   items: GalleryItem[];
   heading?: string;
   extra?: React.ReactNode;
+  totalCount?: number;
 }) {
-  const [mode, setMode] = useState<'grid' | 'list'>('grid');
+  const [mode, setMode] = useState<'album' | 'compact' | 'list'>('album');
   return (
     <section className="collection-gallery">
       <div className="gallery-heading">
         <span>
-          {heading} · {items.length} 项
+          {heading} · {totalCount ?? items.length} 项
         </span>
         <div className="gallery-tools">
           {extra}
           <div className="view-switch" aria-label="展示方式">
             <button
-              aria-label="图卡模式"
-              aria-pressed={mode === 'grid'}
-              className={mode === 'grid' ? 'selected' : ''}
-              onClick={() => setMode('grid')}
+              aria-label="收藏册模式"
+              aria-pressed={mode === 'album'}
+              className={mode === 'album' ? 'selected' : ''}
+              onClick={() => setMode('album')}
             >
-              <LayoutGrid size={16} />
-              <span>图卡</span>
+              <Images size={16} />
+              <span>收藏册</span>
+            </button>
+            <button
+              aria-label="紧凑模式"
+              aria-pressed={mode === 'compact'}
+              className={mode === 'compact' ? 'selected' : ''}
+              onClick={() => setMode('compact')}
+            >
+              <Grid2X2 size={16} />
+              <span>紧凑</span>
             </button>
             <button
               aria-label="列表模式"

@@ -115,6 +115,7 @@ export default function CatalogBrowser({
           <CollectionGallery
             heading={chosen ? `${chosen.label} · ${inventory ? '我的收藏' : '图鉴'}` : heading}
             items={paged}
+            totalCount={visible.length}
           />
           {pagination}
         </>

@@ -79,6 +79,7 @@ try {
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://localhost:3000/', { waitUntil: 'networkidle' });
+  await page.getByRole('heading', { name: /你好，岛屿测试员/ }).waitFor();
   const mobileLabels = await page.locator('.app-mobile-nav a').allTextContents();
   if (mobileLabels.join('|') !== '首页|图鉴|收藏柜|心愿|我的') {
     throw Error(`Unexpected mobile navigation: ${mobileLabels.join('|')}`);
@@ -95,6 +96,20 @@ try {
   await page.locator('.modal-backdrop .modal').waitFor();
   await page.keyboard.press('Escape');
   await page.screenshot({ path: '.local/screenshots/shell-mobile-390.png', fullPage: true });
+
+  await page.goto('http://localhost:3000/inventory', { waitUntil: 'networkidle' });
+  if ((await page.locator('.inventory-overview-stats article').count()) !== 4) {
+    throw Error('Inventory overview does not contain four stat cards');
+  }
+  await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
+  const firstSeries = page.locator('.catalog-series-grid > button').first();
+  if (await firstSeries.count()) {
+    await firstSeries.click();
+    await page.getByRole('button', { name: '紧凑模式' }).click();
+    await page.locator('.collection-items.compact').waitFor();
+    await page.getByRole('button', { name: '列表模式' }).click();
+    await page.locator('.collection-items.list').waitFor();
+  }
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
@@ -122,6 +137,9 @@ try {
       'five-tab mobile navigation',
       '44px touch targets',
       'quick action sheet',
+      'Dashboard greeting',
+      'Inventory stats',
+      'three Catalog views',
       'global search',
       'viewport lock',
       'PWA manifest',
