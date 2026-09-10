@@ -841,6 +841,11 @@ export default function Cabinet({
       );
       content = (
         <>
+          <div className="page-intro">
+            <span className="eyebrow">PASS ON THE JOY</span>
+            <h1>正在出物</h1>
+            <p>挂出只是整理计划，确认成交后才会扣减库存。</p>
+          </div>
           <div className="notice">
             挂出不扣库存。选择出物记录可直接制作海报，实际成交后再扣库存。
           </div>
@@ -948,49 +953,118 @@ export default function Cabinet({
       );
     } else if (path === '/groups')
       content = (
-        <div className="group-grid">
-          {data.groups
-            .filter(
-              (g) =>
-                (!q || g.name.includes(q) || g.items.some((i) => matches(i.productId))) &&
-                (!status || g.status === status),
-            )
-            .map((g) => (
-              <Link className="group-card" href={'/groups/' + g.id} key={g.id}>
-                <div className="group-card-top">
-                  <Users size={24} />
-                  <span className="pill">{statusNames[g.status]}</span>
-                </div>
-                <h2>{g.name}</h2>
-                <p>团长 · {g.groupOwner}</p>
-                <div className="group-counts">
-                  <span>
-                    <strong>
-                      {g.items.reduce((n, i) => n + (i.purchase?.quantity ?? i.quantity), 0)}
-                    </strong>
-                    件商品
-                  </span>
-                  <span>
-                    <strong>
-                      {g.items.filter((i) => i.purchase?.arrivalStatus !== 'ARRIVED').length}
-                    </strong>
-                    项待到货
-                  </span>
-                  <span>
-                    <strong>
-                      {g.items.filter((i) => i.dispatchStatus !== 'DISPATCHED').length}
-                    </strong>
-                    项待排发
-                  </span>
-                </div>
-                <div className="group-link">
-                  看看团里的喜欢 <ArrowRight size={16} />
-                </div>
-              </Link>
-            ))}
-          {!data.groups.length &&
-            empty('跟同好一起，等待喜欢到来', '记录拼团', () => setDialog({ type: 'group' }))}
-        </div>
+        <>
+          <div className="page-intro">
+            <span className="eyebrow">COLLECT TOGETHER</span>
+            <h1>我的拼团 🌿</h1>
+            <p>和同好一起拼，更快收获喜欢的谷子！</p>
+          </div>
+          <div className="group-overview-stats">
+            <article>
+              <span>进行中</span>
+              <strong>{data.groups.filter((group) => group.status === 'OPEN').length}</strong>
+            </article>
+            <article>
+              <span>待付款</span>
+              <strong>
+                {
+                  data.groups
+                    .flatMap((group) => group.items)
+                    .filter((item) => item.paymentStatus === 'UNPAID').length
+                }
+              </strong>
+            </article>
+            <article>
+              <span>待到货</span>
+              <strong>
+                {
+                  data.groups
+                    .flatMap((group) => group.items)
+                    .filter(
+                      (item) =>
+                        item.purchase &&
+                        !['ARRIVED', 'CANCELLED'].includes(item.purchase.arrivalStatus),
+                    ).length
+                }
+              </strong>
+            </article>
+            <article>
+              <span>待排发</span>
+              <strong>
+                {
+                  data.groups
+                    .flatMap((group) => group.items)
+                    .filter(
+                      (item) =>
+                        item.dispatchStatus === 'NOT_DISPATCHED' &&
+                        item.purchase?.arrivalStatus !== 'CANCELLED',
+                    ).length
+                }
+              </strong>
+            </article>
+          </div>
+          <div className="group-grid">
+            {data.groups
+              .filter(
+                (g) =>
+                  (!q || g.name.includes(q) || g.items.some((i) => matches(i.productId))) &&
+                  (!status || g.status === status),
+              )
+              .map((g) => (
+                <Link className="group-card" href={'/groups/' + g.id} key={g.id}>
+                  <div className="group-card-collage">
+                    {g.items.slice(0, 4).map((item) => {
+                      const product = productById(item.productId);
+                      return product ? <ProductArt key={item.id} product={product} /> : null;
+                    })}
+                    {!g.items.length && (
+                      <span>
+                        <Users size={30} />
+                      </span>
+                    )}
+                  </div>
+                  <div className="group-card-top">
+                    <Users size={24} />
+                    <span className="pill">{statusNames[g.status]}</span>
+                  </div>
+                  <h2>{g.name}</h2>
+                  <p>团长 · {g.groupOwner}</p>
+                  <div className="group-counts">
+                    <span>
+                      <strong>
+                        {g.items.reduce((n, i) => n + (i.purchase?.quantity ?? i.quantity), 0)}
+                      </strong>
+                      件商品
+                    </span>
+                    <span>
+                      <strong>
+                        {g.items.filter((i) => i.purchase?.arrivalStatus !== 'ARRIVED').length}
+                      </strong>
+                      项待到货
+                    </span>
+                    <span>
+                      <strong>
+                        {g.items.filter((i) => i.dispatchStatus !== 'DISPATCHED').length}
+                      </strong>
+                      项待排发
+                    </span>
+                  </div>
+                  <div className="group-progress">
+                    <i
+                      style={{
+                        width: `${g.items.length ? Math.round((g.items.filter((item) => item.purchase?.arrivalStatus === 'ARRIVED').length / g.items.length) * 100) : 0}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="group-link">
+                    看看团里的喜欢 <ArrowRight size={16} />
+                  </div>
+                </Link>
+              ))}
+            {!data.groups.length &&
+              empty('跟同好一起，等待喜欢到来', '记录拼团', () => setDialog({ type: 'group' }))}
+          </div>
+        </>
       );
     else if (groupDetail)
       content = (

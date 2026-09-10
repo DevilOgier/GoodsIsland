@@ -2,10 +2,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Palette, Save, Plus, X } from 'lucide-react';
 import type { Snapshot } from './types';
-import { renderPoster, templates, ratios } from '@/poster/renderer';
+import { renderPoster, templates } from '@/poster/renderer';
 import type { PosterItemData } from '@/poster/renderer';
 import { posterPrefill } from '@/domain/poster-prefill';
 import ProductPicker from './product-picker';
+import { TemplateSelector } from './poster/template-selector';
+import { PosterPreview } from './poster/poster-preview';
 async function assetData(id: string) {
   const r = await fetch('/api/images/' + id);
   if (!r.ok) throw Error('商品图片加载失败');
@@ -242,30 +244,15 @@ export default function PosterEditor({
               />
             </div>
           ))}
-          <h3>03 / 选择纸张和风格</h3>
-          <div className="ratio-options">
-            {Object.keys(ratios).map((r) => (
-              <button className={ratio === r ? 'selected' : ''} key={r} onClick={() => setRatio(r)}>
-                {r}
-              </button>
-            ))}
-          </div>
-          <div className="template-options">
-            {Object.entries(templates).map(([key, t]) => (
-              <button
-                className={template === key ? 'selected' : ''}
-                style={{ background: t.background }}
-                key={key}
-                onClick={() => {
-                  setTemplate(key);
-                  setVersion(2);
-                }}
-              >
-                <strong>{t.label}</strong>
-                <small>{t.description}</small>
-              </button>
-            ))}
-          </div>
+          <TemplateSelector
+            ratio={ratio}
+            template={template}
+            onRatioChange={setRatio}
+            onTemplateChange={(key) => {
+              setTemplate(key);
+              setVersion(2);
+            }}
+          />
           <p className="muted">导出海报不会挂出或扣库存。挂出请在“正在出物”中操作。</p>
           <button
             disabled={busy || imageLoading || !rendered.svg}
@@ -304,47 +291,27 @@ export default function PosterEditor({
             <Save size={16} /> 保存到作品集
           </button>
         </section>
-        <section className="poster-preview-panel">
-          <div className="preview-heading">
-            <span>实时预览</span>
-            <small>
-              {ratio} · {templates[template].label}
-            </small>
-          </div>
-          <div className="poster-preview">
-            {rendered.svg ? (
-              <img
-                src={'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(rendered.svg)}
-                alt="海报实时预览"
-              />
-            ) : (
-              <div className="empty">
-                <Plus size={32} />
-                <p>{rendered.error}</p>
-              </div>
-            )}
-          </div>
-          {error && (
-            <p role="status" className="notice">
-              {error}
-            </p>
-          )}
-          <div className="export-actions">
-            <button
-              className="primary"
-              disabled={busy || imageLoading || !rendered.svg}
-              onClick={() => exportImage('png')}
-            >
-              <Download size={16} /> 导出 PNG
-            </button>
-            <button
-              disabled={busy || imageLoading || !rendered.svg}
-              onClick={() => exportImage('jpeg')}
-            >
-              导出 JPG
-            </button>
-          </div>
-        </section>
+        <PosterPreview
+          svg={rendered.svg}
+          error={rendered.error}
+          ratio={ratio}
+          templateLabel={templates[template].label}
+          status={error}
+        >
+          <button
+            className="primary"
+            disabled={busy || imageLoading || !rendered.svg}
+            onClick={() => exportImage('png')}
+          >
+            <Download size={16} /> 导出 PNG
+          </button>
+          <button
+            disabled={busy || imageLoading || !rendered.svg}
+            onClick={() => exportImage('jpeg')}
+          >
+            导出 JPG
+          </button>
+        </PosterPreview>
       </div>
       {picking && (
         <ProductPicker

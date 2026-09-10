@@ -124,8 +124,23 @@ try {
   await page.goto('http://localhost:3000/accounting', { waitUntil: 'networkidle' });
   if (await page.locator('.account-table').isVisible())
     throw Error('Accounting table remains visible on mobile');
+  await page.goto('http://localhost:3000/groups', { waitUntil: 'networkidle' });
+  if ((await page.locator('.group-overview-stats article').count()) !== 4)
+    throw Error('Group overview does not contain four stat cards');
+  await page.goto('http://localhost:3000/posters', { waitUntil: 'networkidle' });
+  const mobilePreviewBox = await page.locator('.poster-preview-panel').boundingBox();
+  const mobileSettingsBox = await page.locator('.poster-settings').boundingBox();
+  if (!mobilePreviewBox || !mobileSettingsBox || mobilePreviewBox.y >= mobileSettingsBox.y)
+    throw Error('Poster preview is not above controls on mobile');
+  if ((await page.locator('.template-card').count()) !== 4)
+    throw Error('Poster Studio does not expose four visual templates');
 
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto('http://localhost:3000/posters', { waitUntil: 'networkidle' });
+  const desktopPreviewBox = await page.locator('.poster-preview-panel').boundingBox();
+  const desktopSettingsBox = await page.locator('.poster-settings').boundingBox();
+  if (!desktopPreviewBox || !desktopSettingsBox || desktopPreviewBox.x <= desktopSettingsBox.x)
+    throw Error('Poster Studio is not a two-column desktop workspace');
   await page.goto('http://localhost:3000/purchases', { waitUntil: 'networkidle' });
   await page.getByRole('button', { name: '添加' }).click();
   const desktopPurchaseForm = page.locator('.action-form--purchase');
@@ -136,7 +151,9 @@ try {
     desktopFormBox.width > 481 ||
     Math.abs(desktopFormBox.x + desktopFormBox.width - 1440) > 1
   ) {
-    throw Error(`Purchase form is not a right-side desktop drawer: ${JSON.stringify(desktopFormBox)}`);
+    throw Error(
+      `Purchase form is not a right-side desktop drawer: ${JSON.stringify(desktopFormBox)}`,
+    );
   }
   await desktopPurchaseForm.getByRole('button', { name: '关闭' }).click();
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
@@ -170,6 +187,9 @@ try {
       'transaction drawer and mobile form',
       'purchase channel picker',
       'mobile accounting cards',
+      'Group overview cards',
+      'Poster mobile preview order',
+      'Poster desktop columns and templates',
       'global search',
       'viewport lock',
       'PWA manifest',
