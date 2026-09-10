@@ -4,22 +4,18 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Flower2,
-  LayoutDashboard,
   BookOpen,
   Archive,
   ArrowDownLeft,
   ArrowUpRight,
   Users,
   Heart,
-  Tag,
   Palette,
-  Settings,
   Search,
   Plus,
   SlidersHorizontal,
   ChevronRight,
   Package,
-  LogOut,
   ArrowRight,
   X,
   Sparkles,
@@ -41,19 +37,9 @@ import CollectionGallery from './collection-gallery';
 import AccountingPanel from './accounting-panel';
 import AccountPanel from './account-panel';
 import CatalogBrowser from './catalog-browser';
-const nav = [
-  ['/', '我的小岛', LayoutDashboard],
-  ['/products', '谷子图鉴', BookOpen],
-  ['/inventory', '我的收藏柜', Archive],
-  ['/purchases', '买入记录', ArrowDownLeft],
-  ['/sales', '卖出记录', ArrowUpRight],
-  ['/accounting', '收支账本', BookOpen],
-  ['/groups', '我的拼团', Users],
-  ['/wanted', '收物心愿', Heart],
-  ['/listings', '正在出物', Tag],
-  ['/posters', '海报工坊', Palette],
-  ['/admin', '图鉴管理', Settings],
-] as const;
+import { AppShell, appNavigation, MoreMenu } from './layout';
+import { Toast } from './ui';
+import type { QuickAction } from './layout/quick-action-sheet';
 export default function Cabinet({
   user,
 }: {
@@ -64,16 +50,19 @@ export default function Cabinet({
   const searchParams = useSearchParams();
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: 'success' | 'error' | 'info';
+  } | null>(null);
   const [pendingAction, setPendingAction] = useState('');
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(searchParams.get('q') ?? '');
   const [filter, setFilter] = useState(false);
-  const [ip, setIp] = useState('');
-  const [character, setCharacter] = useState('');
-  const [series, setSeries] = useState('');
-  const [tag, setTag] = useState('');
-  const [type, setType] = useState('');
+  const [ip, setIp] = useState(searchParams.get('ip') ?? '');
+  const [character, setCharacter] = useState(searchParams.get('character') ?? '');
+  const [series, setSeries] = useState(searchParams.get('series') ?? '');
+  const [tag, setTag] = useState(searchParams.get('tag') ?? '');
+  const [type, setType] = useState(searchParams.get('type') ?? '');
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [imageBusy, setImageBusy] = useState(false);
   const load = useCallback(
@@ -129,11 +118,11 @@ export default function Cabinet({
   }, [load]);
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(''), 4000);
+    const timer = window.setTimeout(() => setToast(null), 4000);
     return () => window.clearTimeout(timer);
   }, [toast]);
-  const notify = (message: string) => {
-    setToast(message);
+  const notify = (message: string, tone: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, tone });
   };
   const logout = async () => {
     await fetch('/api/auth', {
@@ -177,7 +166,7 @@ export default function Cabinet({
     try {
       await save(op, payload, successMessage);
     } catch (e) {
-      notify((e as Error).message);
+      notify((e as Error).message, 'error');
     } finally {
       setPendingAction('');
     }
@@ -215,7 +204,7 @@ export default function Cabinet({
       await load();
       notify(action === 'enhance' ? '已加入增强任务，完成后可切换原图' : '图片已更新');
     } catch (e) {
-      notify((e as Error).message);
+      notify((e as Error).message, 'error');
     } finally {
       setImageBusy(false);
     }
@@ -247,7 +236,7 @@ export default function Cabinet({
       await load();
       notify('原图已安全保存');
     } catch (e) {
-      notify((e as Error).message);
+      notify((e as Error).message, 'error');
     } finally {
       setImageBusy(false);
     }
@@ -259,7 +248,7 @@ export default function Cabinet({
     ? data?.groups.find((g) => g.id === path.split('/')[2])
     : undefined;
   const section =
-    (path === '/me' ? '我的账号' : nav.find((n) => n[0] === path)?.[1]) ??
+    (path === '/me' ? '我的账号' : appNavigation.find((item) => item.href === path)?.label) ??
     (selected ? '谷子详情' : groupDetail ? '拼团详情' : '我的小岛');
   const all = data?.products ?? [];
   const filtered = all.filter(
@@ -1288,7 +1277,13 @@ export default function Cabinet({
           </section>
         </>
       );
-    else if (path === '/me') content = <AccountPanel user={user} onLogout={logout} />;
+    else if (path === '/me')
+      content = (
+        <>
+          <AccountPanel user={user} onLogout={logout} />
+          <MoreMenu role={user.role} />
+        </>
+      );
     else if (['/ips', '/characters', '/series'].includes(path))
       content = (
         <>
@@ -1299,9 +1294,9 @@ export default function Cabinet({
     else
       content = (
         <div className="more-grid">
-          {nav
-            .filter((n) => n[0] !== '/admin' || user.role === 'ADMIN')
-            .map(([href, label, Icon]) => (
+          {appNavigation
+            .filter((item) => !item.admin || user.role === 'ADMIN')
+            .map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href}>
                 <Icon />
                 <span>{label}</span>
@@ -1311,74 +1306,18 @@ export default function Cabinet({
         </div>
       );
   }
+  const openQuickAction = (action: QuickAction) => setDialog({ type: action });
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <Link href="/" className="brand">
-          <span className="brand-mark">
-            <Flower2 size={26} />
-          </span>
-          <span>
-            谷屿<small>GUYU COLLECTION</small>
-          </span>
-        </Link>
-        <div className="nav-label">我的收藏生活</div>
-        <nav>
-          {nav
-            .filter((n) => n[0] !== '/admin' || user.role === 'ADMIN')
-            .map(([href, label, Icon]) => (
-              <Link
-                className={
-                  path === href || (href !== '/' && path.startsWith(href + '/')) ? 'active' : ''
-                }
-                key={href}
-                href={href}
-              >
-                <Icon size={19} />
-                {label}
-                {href === '/posters' && <span className="new-tag">NEW</span>}
-              </Link>
-            ))}
-        </nav>
-        <div className="sidebar-note">
-          <Flower2 size={20} />
-          <p>
-            小小的谷子，
-            <br />
-            大大的喜欢。
-          </p>
-          <span>COLLECT LITTLE JOYS</span>
-        </div>
-        <div className="profile">
-          <span className="avatar">{user.name.slice(0, 1)}</span>
-          <div>
-            <strong>{user.name}</strong>
-            <small>我的私人收藏柜</small>
-          </div>
-          <button
-            className="icon-btn"
-            aria-label="退出登录"
-            title="退出或切换账号"
-            onClick={() => void logout()}
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-      </aside>
-      <main className="main">
-        <header className="topbar">
-          <div className="breadcrumb">
-            <Flower2 size={18} /> <span>我的收藏生活</span>
-            <ChevronRight size={14} />
-            <strong>{section}</strong>
-          </div>
-          <div className="top-right">
-            <span className="online-dot" />
-            <span>记录每一份喜欢</span>
-            <span className="avatar small">{user.name.slice(0, 1)}</span>
-          </div>
-        </header>
-        <div className="content">
+    <>
+      <AppShell
+        path={path}
+        section={section}
+        user={user}
+        data={data}
+        onLogout={logout}
+        onQuickAction={openQuickAction}
+      >
+        <div className="app-content">
           {path !== '/' &&
             !selected &&
             !groupDetail &&
@@ -1455,24 +1394,7 @@ export default function Cabinet({
             <span>GUYU · YOUR LITTLE COLLECTION ISLAND</span>
           </footer>
         </div>
-      </main>
-      <nav className="bottom-nav">
-        {[
-          ['/', '首页', LayoutDashboard],
-          ['/products', '图鉴', BookOpen],
-          ['/inventory', '库存', Archive],
-          ['/transactions', '交易', ArrowDownLeft],
-          ['/me', '我的', Heart],
-        ].map(([href, label, Icon]) => {
-          const I = Icon as typeof Heart;
-          return (
-            <Link className={path === href ? 'active' : ''} key={String(href)} href={String(href)}>
-              <I size={21} />
-              <span>{String(label)}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      </AppShell>
       {dialog && data && (
         <ActionForm
           dialog={dialog}
@@ -1549,11 +1471,7 @@ export default function Cabinet({
           </section>
         </div>
       )}
-      {toast && (
-        <div className="toast" role="status">
-          {toast}
-        </div>
-      )}
-    </div>
+      {toast && <Toast message={toast.message} tone={toast.tone} />}
+    </>
   );
 }

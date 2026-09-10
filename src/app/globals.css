@@ -1,13 +1,7 @@
 @import 'tailwindcss';
-:root {
-  --bg: #f8f7f3;
-  --panel: #fffefa;
-  --ink: #343c32;
-  --muted: #8b9087;
-  --line: #e9e9e1;
-  --green: #647653;
-  --soft: #edf0e7;
-}
+@import '../styles/tokens.css';
+@import '../styles/components.css';
+@import '../styles/layout.css';
 * {
   box-sizing: border-box;
 }
@@ -15,8 +9,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
-  font-size: 14px;
+  font-family: var(--font-sans);
+  font-size: 15px;
   -webkit-font-smoothing: antialiased;
 }
 button,
