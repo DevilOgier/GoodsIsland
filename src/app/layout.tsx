@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import ButtonFeedback from '@/components/button-feedback';
 export const metadata: Metadata = {
   title: '谷屿 · 谷子收藏柜',
   description: '把每一份喜欢，好好收藏。谷子图鉴、库存与收出物海报。',
@@ -17,7 +18,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <ButtonFeedback />
+        {children}
+      </body>
     </html>
   );
 }

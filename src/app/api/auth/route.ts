@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     originGuard(request);
     const d = z
       .object({
-        action: z.enum(['login', 'setup', 'logout', 'register']),
+        action: z.enum(['login', 'setup', 'logout', 'register', 'signup']),
         email: z.email().optional(),
         password: z.string().min(10).max(128).optional(),
         name: z.string().min(1).max(50).optional(),
@@ -30,6 +30,21 @@ export async function POST(request: Request) {
     }
     ensure(d.email && d.password, '请填写邮箱和至少10位密码');
     const email = d.email.toLowerCase();
+    if (d.action === 'signup') {
+      ensure((await db.user.count()) > 0, '请先创建管理员账号', 409);
+      ensure(d.name, '请填写收藏家昵称');
+      ensure(!(await db.user.findUnique({ where: { email } })), '这个邮箱已经注册过了', 409);
+      const user = await db.user.create({
+        data: {
+          email,
+          name: d.name,
+          passwordHash: hashPassword(d.password),
+          role: 'USER',
+        },
+      });
+      await createSession(user.id);
+      return Response.json({ id: user.id, name: user.name, email: user.email });
+    }
     if (d.action === 'register') {
       await requireUser(true);
       ensure(d.name, '请填写收藏家昵称');

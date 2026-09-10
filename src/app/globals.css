@@ -30,6 +30,7 @@ a {
   text-decoration: none;
 }
 button {
+  --tap-color: rgba(100, 118, 83, 0.2);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -54,28 +55,39 @@ button:hover {
   background: #f0f2eb;
 }
 button:not(:disabled):active {
-  transform: scale(0.95);
-  box-shadow: 0 0 0 4px #9bac8840;
+  transform: translateY(1px) scale(0.975);
+  box-shadow: inset 0 2px 5px rgba(64, 78, 52, 0.11);
 }
 button.tap-feedback::after {
   content: '';
   position: absolute;
-  inset: 0;
-  border: 3px solid #82966d;
-  border-radius: inherit;
+  left: var(--tap-x, 50%);
+  top: var(--tap-y, 50%);
+  width: 180%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--tap-color) 0 30%, transparent 68%);
   pointer-events: none;
-  animation: tap-ring 0.62s ease-out;
+  transform: translate(-50%, -50%) scale(0.12);
+  animation: tap-ripple 0.52s cubic-bezier(0.2, 0.72, 0.28, 1);
 }
-@keyframes tap-ring {
+@keyframes tap-ripple {
   0% {
-    opacity: 0.95;
-    transform: scale(0.84);
-    background: #8fa17b42;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.12);
+  }
+  24% {
+    opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: scale(1.12);
-    background: transparent;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@media (hover: hover) {
+  button:not(:disabled):hover:not(:active) {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 14px rgba(65, 77, 54, 0.08);
   }
 }
 button:disabled {
@@ -88,6 +100,7 @@ a:focus-visible {
   outline-offset: 3px;
 }
 .primary {
+  --tap-color: rgba(255, 255, 255, 0.28);
   background: var(--green);
   color: white;
   border-color: var(--green);
@@ -1156,6 +1169,9 @@ input::placeholder {
   .toast {
     animation: none;
   }
+  button.tap-feedback::after {
+    opacity: 0;
+  }
 }
 .bottom-nav {
   display: none;
@@ -1219,6 +1235,45 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+.auth-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #e5e7dd;
+  border-radius: 12px;
+  background: #f2f3ed;
+}
+.auth-switch button {
+  flex: 1;
+  min-height: 38px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #848b7c;
+  font-size: 12px;
+  font-weight: 600;
+}
+.auth-switch button.selected {
+  border: 0 !important;
+  background: #fffefa !important;
+  color: #526447;
+  box-shadow: 0 3px 10px rgba(70, 83, 58, 0.09);
+}
+.auth-heading {
+  animation: auth-content-in 0.28s ease-out;
+}
+.auth-heading p {
+  margin-top: 8px;
+}
+.auth-confirm {
+  animation: auth-content-in 0.28s ease-out;
+}
+@keyframes auth-content-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
 }
 .login-form .brand {
   margin-bottom: 10px;

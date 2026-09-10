@@ -128,18 +128,6 @@ export default function Cabinet({
     };
   }, [load]);
   useEffect(() => {
-    const showTap = (event: PointerEvent) => {
-      const button = (event.target as Element | null)?.closest('button');
-      if (!button || button.disabled) return;
-      button.classList.remove('tap-feedback');
-      void button.offsetWidth;
-      button.classList.add('tap-feedback');
-      window.setTimeout(() => button.classList.remove('tap-feedback'), 620);
-    };
-    document.addEventListener('pointerdown', showTap);
-    return () => document.removeEventListener('pointerdown', showTap);
-  }, []);
-  useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(''), 4000);
     return () => window.clearTimeout(timer);
