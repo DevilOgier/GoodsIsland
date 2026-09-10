@@ -162,6 +162,14 @@ try {
     await page.getByLabel('全局搜索').fill(product.name);
     await page.locator('.app-search-results a').first().waitFor();
   }
+  await page.goto('http://localhost:3000/admin', { waitUntil: 'networkidle' });
+  const adminTabs = await page.locator('.admin-tabs button').allTextContents();
+  if (adminTabs.join('|') !== '商品|IP|角色|系列|谷子类型|标签') {
+    throw Error(`Unexpected admin navigation: ${adminTabs.join('|')}`);
+  }
+  await page.getByRole('button', { name: '系列', exact: true }).click();
+  if (!(await page.locator('.catalog-taxonomy').isVisible()))
+    throw Error('Admin taxonomy panel does not open from its tab');
   await page.screenshot({ path: '.local/screenshots/shell-desktop-1440.png', fullPage: true });
 
   const manifest = await page.evaluate(async () => {
@@ -170,6 +178,21 @@ try {
   });
   if (!manifest || manifest.display !== 'standalone')
     throw Error('PWA manifest is missing or changed');
+
+  const guest = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const guestPage = await guest.newPage();
+  await guestPage.goto('http://localhost:3000/login', { waitUntil: 'networkidle' });
+  if (await guestPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1))
+    throw Error('Login page overflows at 390px');
+  await guestPage.getByRole('tab', { name: '注册' }).click();
+  await guestPage.getByRole('heading', { name: '创建你的收藏柜' }).waitFor();
+  if (!(await guestPage.getByLabel('确认密码').isVisible()))
+    throw Error('Registration fields are not available to a new user');
+  await guestPage.setViewportSize({ width: 1440, height: 1000 });
+  await guestPage.reload({ waitUntil: 'networkidle' });
+  if (!(await guestPage.locator('.login-art').isVisible()))
+    throw Error('Desktop login brand panel is missing');
+  await guest.close();
   if (errors.length) throw Error(errors.join('\n'));
   const result = {
     ok: true,
@@ -191,6 +214,9 @@ try {
       'Poster mobile preview order',
       'Poster desktop columns and templates',
       'global search',
+      'six-section Admin navigation',
+      'mobile registration flow',
+      'responsive login page',
       'viewport lock',
       'PWA manifest',
     ],

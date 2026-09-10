@@ -39,7 +39,7 @@ import AccountingPanel from './accounting-panel';
 import AccountPanel from './account-panel';
 import CatalogBrowser from './catalog-browser';
 import { AppShell, appNavigation, MoreMenu } from './layout';
-import { Toast } from './ui';
+import { EmptyState, Toast } from './ui';
 import type { QuickAction } from './layout/quick-action-sheet';
 export default function Cabinet({
   user,
@@ -66,6 +66,9 @@ export default function Cabinet({
   const [type, setType] = useState(searchParams.get('type') ?? '');
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [imageBusy, setImageBusy] = useState(false);
+  const [adminTab, setAdminTab] = useState<
+    'product' | 'ip' | 'character' | 'series' | 'productType' | 'tag'
+  >('product');
   const load = useCallback(
     async (force = true) => {
       try {
@@ -313,17 +316,19 @@ export default function Cabinet({
     );
   }
   const empty = (text: string, button?: string, onClick?: () => void) => (
-    <div className="empty">
-      <Flower2 size={38} strokeWidth={1} />
-      <h3>{text}</h3>
-      <p>慢慢来，把每一份喜欢放进这里。</p>
-      {button && (
-        <button className="primary" onClick={onClick}>
-          {button}
-          <Plus size={16} />
-        </button>
-      )}
-    </div>
+    <EmptyState
+      icon={<Flower2 size={34} strokeWidth={1.2} />}
+      title={text}
+      description="慢慢来，把每一份喜欢放进这里。"
+      action={
+        button ? (
+          <button className="primary" onClick={onClick}>
+            {button}
+            <Plus size={16} />
+          </button>
+        ) : undefined
+      }
+    />
   );
   const matches = (id: string) => filtered.some((p) => p.id === id);
   const actionButton = (kind: string, label: string, id?: string, productId?: string) => (
@@ -1222,7 +1227,28 @@ export default function Cabinet({
               {actionButton('entity', '添加 IP / 角色 / 系列 / 标签')}
             </div>
           </div>
-          <div className="record-list">
+          <nav className="admin-tabs" aria-label="图鉴管理分类">
+            {(
+              [
+                ['product', '商品'],
+                ['ip', 'IP'],
+                ['character', '角色'],
+                ['series', '系列'],
+                ['productType', '谷子类型'],
+                ['tag', '标签'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-current={adminTab === key ? 'page' : undefined}
+                onClick={() => setAdminTab(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+          <div className="record-list admin-product-list" hidden={adminTab !== 'product'}>
             {filtered.map((p) => (
               <article className="record" key={p.id}>
                 {recordProduct(p.id)}
@@ -1309,17 +1335,27 @@ export default function Cabinet({
                 </button>
               </article>
             ))}
+            {!filtered.length &&
+              empty('图鉴里还没有符合条件的谷子', '添加第一款谷子', () =>
+                setDialog({ type: 'product' }),
+              )}
           </div>
-          <section className="catalog-taxonomy">
+          <section className="catalog-taxonomy" hidden={adminTab === 'product'}>
             <div className="section-heading">
               <div>
                 <span className="eyebrow">CATALOG STRUCTURE</span>
-                <h2>分类与类型管理</h2>
+                <h2>
+                  {adminTab === 'productType'
+                    ? '谷子类型管理'
+                    : adminTab === 'tag'
+                      ? '标签管理'
+                      : `${adminTab === 'ip' ? 'IP' : adminTab === 'character' ? '角色' : '系列'}管理`}
+                </h2>
               </div>
               <p>删除 IP、角色或系列会同时删除其下没有图片和业务记录的图鉴内容。</p>
             </div>
             <div className="taxonomy-grid">
-              <article>
+              <article hidden={adminTab !== 'ip'}>
                 <h3>IP</h3>
                 {data.ips.map((item) => (
                   <div className="taxonomy-row" key={item.id}>
@@ -1335,7 +1371,7 @@ export default function Cabinet({
                 ))}
                 {!data.ips.length && <small className="muted">暂无 IP</small>}
               </article>
-              <article>
+              <article hidden={adminTab !== 'character'}>
                 <h3>角色</h3>
                 {data.characters.map((item) => (
                   <div className="taxonomy-row" key={item.id}>
@@ -1354,7 +1390,7 @@ export default function Cabinet({
                 ))}
                 {!data.characters.length && <small className="muted">暂无角色</small>}
               </article>
-              <article>
+              <article hidden={adminTab !== 'series'}>
                 <h3>系列</h3>
                 {data.series.map((item) => (
                   <div className="taxonomy-row" key={item.id}>
@@ -1378,43 +1414,48 @@ export default function Cabinet({
                 ))}
                 {!data.series.length && <small className="muted">暂无系列</small>}
               </article>
-              <article>
-                <h3>自定义类型与标签</h3>
-                {data.productTypes
-                  .filter((item) => item.key.startsWith('CUSTOM_'))
-                  .map((item) => (
-                    <div className="taxonomy-row" key={item.key}>
+              <article hidden={!['productType', 'tag'].includes(adminTab)}>
+                <h3>{adminTab === 'productType' ? '自定义谷子类型' : '标签'}</h3>
+                {adminTab === 'productType' &&
+                  data.productTypes
+                    .filter((item) => item.key.startsWith('CUSTOM_'))
+                    .map((item) => (
+                      <div className="taxonomy-row" key={item.key}>
+                        <span>
+                          <small>类型</small>
+                          {item.name}
+                        </span>
+                        <button
+                          className="small-btn danger"
+                          aria-label={'删除类型 ' + item.name}
+                          onClick={() => void removeCatalog('productType', item.key, item.name)}
+                        >
+                          <Trash2 size={14} /> 删除
+                        </button>
+                      </div>
+                    ))}
+                {adminTab === 'tag' &&
+                  data.tags.map((item) => (
+                    <div className="taxonomy-row" key={item.id}>
                       <span>
-                        <small>类型</small>
+                        <small>标签</small>
                         {item.name}
                       </span>
                       <button
                         className="small-btn danger"
-                        aria-label={'删除类型 ' + item.name}
-                        onClick={() => void removeCatalog('productType', item.key, item.name)}
+                        aria-label={'删除标签 ' + item.name}
+                        onClick={() => void removeCatalog('tag', item.id, item.name)}
                       >
                         <Trash2 size={14} /> 删除
                       </button>
                     </div>
                   ))}
-                {data.tags.map((item) => (
-                  <div className="taxonomy-row" key={item.id}>
-                    <span>
-                      <small>标签</small>
-                      {item.name}
-                    </span>
-                    <button
-                      className="small-btn danger"
-                      aria-label={'删除标签 ' + item.name}
-                      onClick={() => void removeCatalog('tag', item.id, item.name)}
-                    >
-                      <Trash2 size={14} /> 删除
-                    </button>
-                  </div>
-                ))}
-                {!data.tags.length &&
+                {adminTab === 'tag' && !data.tags.length && (
+                  <small className="muted">暂无标签</small>
+                )}
+                {adminTab === 'productType' &&
                   !data.productTypes.some((item) => item.key.startsWith('CUSTOM_')) && (
-                    <small className="muted">暂无自定义类型或标签</small>
+                    <small className="muted">暂无自定义谷子类型</small>
                   )}
               </article>
             </div>

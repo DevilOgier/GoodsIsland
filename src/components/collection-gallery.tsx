@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Grid2X2, Images, List, ImageIcon } from 'lucide-react';
 import type { Product } from './types';
 import ProductArt from './product-art';
+import { EmptyState } from './ui';
 export type GalleryItem = {
   id: string;
   product: Product;
@@ -65,11 +66,11 @@ export default function CollectionGallery({
         </div>
       </div>
       {!items.length ? (
-        <div className="empty">
-          <ImageIcon />
-          <h3>这里暂时没有谷子</h3>
-          <p>可以调整筛选，或添加新的收藏。</p>
-        </div>
+        <EmptyState
+          icon={<ImageIcon />}
+          title="这里暂时没有谷子"
+          description="可以调整筛选，或添加新的收藏。"
+        />
       ) : (
         <div className={'collection-items ' + mode}>
           {items.map((item) => (

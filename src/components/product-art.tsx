@@ -1,4 +1,36 @@
+'use client';
+import { useState } from 'react';
 import type { Product } from './types';
+
+function ProductImage({ id, name, large }: { id: string; name: string; large: boolean }) {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  if (failed)
+    return (
+      <div
+        className={'product-art product-art--failed ' + (large ? 'large' : '')}
+        role="img"
+        aria-label={name + '图片加载失败'}
+      >
+        <span>图片暂时走丢了</span>
+      </div>
+    );
+  return (
+    <div className={'product-art product-art--image ' + (large ? 'large' : '')}>
+      {!loaded && <span className="product-art-loading" aria-hidden="true" />}
+      <img
+        className={loaded ? 'is-loaded' : ''}
+        src={'/api/images/' + id}
+        alt={name}
+        loading={large ? 'eager' : 'lazy'}
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
+
 export default function ProductArt({
   product,
   large = false,
@@ -10,17 +42,8 @@ export default function ProductArt({
     product.selectedSource === 'ENHANCED' && product.enhancedId
       ? product.enhancedId
       : (!large && product.thumbnailId) || product.originalId;
-  if (id)
-    return (
-      <div className={'product-art ' + (large ? 'large' : '')}>
-        <img
-          src={'/api/images/' + id}
-          alt={product.name}
-          loading={large ? 'eager' : 'lazy'}
-          decoding="async"
-        />
-      </div>
-    );
+  const image = id ? <ProductImage key={id} id={id} name={product.name} large={large} /> : null;
+  if (image) return image;
   const palettes = [
     ['#edc8d5', '#f8e9ef', '#c884a0'],
     ['#a7c7c3', '#e2eeea', '#61968f'],
