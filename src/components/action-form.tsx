@@ -236,6 +236,19 @@ export default function ActionForm({
       op = 'group.item';
       fields = [product, qty, unit];
       break;
+    case 'groupDispatch':
+      title = '确认派发';
+      op = 'group.dispatch';
+      fields = [
+        {
+          name: 'shippingFee',
+          label: '本次派发邮费（元）',
+          kind: 'number',
+          value: '0',
+          min: '0',
+        },
+      ];
+      break;
     case 'productEdit':
     case 'product':
       title = '添加图鉴商品';
@@ -322,6 +335,9 @@ export default function ActionForm({
         {dialog.type === 'listing' && (
           <p className="notice">挂出不会减少库存，只有确认成交才会扣减。</p>
         )}
+        {dialog.type === 'groupDispatch' && (
+          <p className="notice">确认后会记录派发邮费，并把这件谷子标记为在路上。</p>
+        )}
         <form
           onSubmit={async (e) => {
             e.preventDefault();
@@ -341,6 +357,7 @@ export default function ActionForm({
             if (dialog.type === 'fees') payload.purchaseId = dialog.id;
             if (dialog.type === 'sale' && dialog.id) payload.listingId = dialog.id;
             if (dialog.type === 'groupItem') payload.groupId = dialog.id;
+            if (dialog.type === 'groupDispatch') payload.id = dialog.id;
             if (dialog.type === 'purchase' && dialog.id) {
               const item = data.groups.flatMap((g) => g.items).find((i) => i.id === dialog.id);
               if (item) payload.groupBuyItemId = item.id;

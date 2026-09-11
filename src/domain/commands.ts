@@ -155,6 +155,63 @@ async function dispatch(
     );
     return tx.groupBuyItem.create({ data: d });
   }
+  if (op === 'group.pay') {
+    const { id } = z.object({ id: z.uuid() }).parse(raw);
+    const item = await tx.groupBuyItem.findFirst({
+      where: { id, group: { userId } },
+      include: { purchase: true, group: true },
+    });
+    ensure(item, '团项不存在', 404);
+    ensure(!['COMPLETED', 'CANCELLED'].includes(item.group.status), '拼团已结束', 409);
+    const purchase =
+      item.purchase ??
+      (await buy(tx, userId, {
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toFixed(2),
+        purchaseChannel: '拼团',
+        purchaseDate: new Date().toISOString().slice(0, 10),
+        arrivalStatus: 'PENDING',
+        groupBuyItemId: item.id,
+      }));
+    await tx.groupBuyItem.update({
+      where: { id: item.id },
+      data: { paymentStatus: 'PAID' },
+    });
+    return purchase;
+  }
+  if (op === 'group.dispatch') {
+    const d = z.object({ id: z.uuid(), shippingFee: amount }).parse(raw);
+    const item = await tx.groupBuyItem.findFirst({
+      where: { id: d.id, group: { userId } },
+      include: { purchase: true, group: true },
+    });
+    ensure(item, '团项不存在', 404);
+    ensure(!['COMPLETED', 'CANCELLED'].includes(item.group.status), '拼团已结束', 409);
+    ensure(item.paymentStatus === 'PAID' && item.purchase, '请先确认已付款', 409);
+    ensure(item.dispatchStatus !== 'DISPATCHED', '该团项已经派发', 409);
+    ensure(
+      !['ARRIVED', 'CANCELLED'].includes(item.purchase.arrivalStatus),
+      '当前购买状态不能派发',
+      409,
+    );
+    if (Number(d.shippingFee) > 0)
+      await addFees(tx, userId, {
+        purchaseId: item.purchase.id,
+        domesticShipping: d.shippingFee,
+        internationalShipping: '0',
+        otherFee: '0',
+        reason: '拼团派发邮费',
+      });
+    await tx.purchase.update({
+      where: { id: item.purchase.id },
+      data: { arrivalStatus: 'SHIPPED' },
+    });
+    return tx.groupBuyItem.update({
+      where: { id: item.id },
+      data: { dispatchStatus: 'DISPATCHED' },
+    });
+  }
   if (op === 'group.item-status') {
     const d = z
       .object({

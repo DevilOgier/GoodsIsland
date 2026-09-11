@@ -122,6 +122,11 @@ export async function buy(tx: Tx, userId: string, raw: unknown) {
       userId,
     },
   });
+  if (p.groupBuyItemId)
+    await tx.groupBuyItem.update({
+      where: { id: p.groupBuyItemId },
+      data: { paymentStatus: 'PAID' },
+    });
   return d.arrivalStatus === 'ARRIVED' ? arrive(tx, userId, p.id) : p;
 }
 async function rebuildInventory(tx: Tx, inventoryId: string) {

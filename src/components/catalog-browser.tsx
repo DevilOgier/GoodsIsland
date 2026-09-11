@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Boxes, ChevronLeft, Layers3, PackageOpen, Shapes } from 'lucide-react';
 import CollectionGallery, { type GalleryItem } from './collection-gallery';
 import ProductArt from './product-art';
+import { SeriesCollage } from './product-picker';
 
 type Granularity = 'all' | 'type' | 'series';
 
@@ -158,11 +159,7 @@ export default function CatalogBrowser({
                   setPage(1);
                 }}
               >
-                <div className={`catalog-collage count-${covers.length}`}>
-                  {covers.map((item) => (
-                    <ProductArt key={item.id} product={item.product} />
-                  ))}
-                </div>
+                <SeriesCollage products={covers.map((item) => item.product)} />
                 <span>
                   <small>{group.caption}</small>
                   <strong>{group.label}</strong>

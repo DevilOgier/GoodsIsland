@@ -126,15 +126,29 @@ try {
   await page.screenshot({ path: '.local/screenshots/shell-mobile-390.png', fullPage: true });
 
   await page.goto('http://localhost:3000/inventory', { waitUntil: 'networkidle' });
-  if ((await page.locator('.inventory-overview-stats article').count()) !== 4) {
+  if ((await page.locator('.inventory-overview-stats > a').count()) !== 4) {
     throw Error('Inventory overview does not contain four stat cards');
   }
+  await page.getByRole('link', { name: /在路上/ }).click();
+  await page.waitForURL('**/inventory?status=IN_TRANSIT');
+  if (
+    !(await page.getByText(/在路上 ×/).count()) &&
+    !(await page.locator('.ui-empty-state').count())
+  )
+    throw Error('Inventory in-transit view did not apply its item filter');
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
   const seriesHeights = await page
     .locator('.catalog-series-grid > button')
     .evaluateAll((cards) => cards.map((card) => Math.round(card.getBoundingClientRect().height)));
   if (seriesHeights.length > 1 && Math.max(...seriesHeights) - Math.min(...seriesHeights) > 1)
     throw Error(`Series cards have inconsistent heights: ${seriesHeights.join(',')}`);
+  const seriesAlignments = await page
+    .locator('.catalog-series-grid > button > span')
+    .evaluateAll((labels) => labels.map((label) => getComputedStyle(label).textAlign));
+  if (seriesAlignments.some((alignment) => alignment !== 'left'))
+    throw Error(
+      `Series card labels are not consistently left aligned: ${seriesAlignments.join(',')}`,
+    );
   const firstSeries = page.locator('.catalog-series-grid > button').first();
   if (await firstSeries.count()) {
     await firstSeries.click();
@@ -147,8 +161,13 @@ try {
   if (await page.locator('.account-table').isVisible())
     throw Error('Accounting table remains visible on mobile');
   await page.goto('http://localhost:3000/groups', { waitUntil: 'networkidle' });
-  if ((await page.locator('.group-overview-stats article').count()) !== 4)
+  if ((await page.locator('.group-overview-stats > a').count()) !== 4)
     throw Error('Group overview does not contain four stat cards');
+  if (await page.locator('.group-card .product-art').count())
+    throw Error('Group cards should not contain product imagery');
+  await page.getByRole('link', { name: /待付款/ }).click();
+  await page.waitForURL('**/groups?view=unpaid');
+  await page.locator('.group-task-panel').waitFor();
   await page.goto('http://localhost:3000/posters', { waitUntil: 'networkidle' });
   const mobilePreviewBox = await page.locator('.poster-preview-panel').boundingBox();
   const mobileSettingsBox = await page.locator('.poster-settings').boundingBox();
@@ -229,6 +248,7 @@ try {
       'dashboard stat destinations',
       'Dashboard greeting',
       'Inventory stats',
+      'Inventory in-transit detail link',
       'album and list Catalog views',
       'transaction drawer and mobile form',
       'purchase channel picker',
@@ -236,6 +256,7 @@ try {
       'uniform Series cards',
       'mobile accounting cards',
       'Group overview cards',
+      'Group task detail links',
       'Poster mobile workflow order',
       'Poster desktop columns and templates',
       'global search',

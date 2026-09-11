@@ -22,7 +22,6 @@ import {
   Upload,
   RefreshCw,
   Trash2,
-  CheckCircle2,
   LoaderCircle,
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
@@ -49,6 +48,7 @@ export default function Cabinet({
   const router = useRouter();
   const path = usePathname();
   const searchParams = useSearchParams();
+  const groupView = searchParams.get('view') ?? '';
   const [data, setData] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{
@@ -269,6 +269,14 @@ export default function Cabinet({
   );
   const productById = (id: string) => all.find((p) => p.id === id);
   const invFor = (id: string) => data?.inventory.find((i) => i.productId === id);
+  const pendingFor = (id: string) =>
+    data?.purchases
+      .filter((purchase) => purchase.productId === id && purchase.arrivalStatus === 'PENDING')
+      .reduce((total, purchase) => total + purchase.quantity, 0) ?? 0;
+  const transitFor = (id: string) =>
+    data?.purchases
+      .filter((purchase) => purchase.productId === id && purchase.arrivalStatus === 'SHIPPED')
+      .reduce((total, purchase) => total + purchase.quantity, 0) ?? 0;
   const listingCount = (id: string) =>
     data?.listings
       .filter((l) => l.inventory.productId === id && l.status === 'ACTIVE')
@@ -451,16 +459,31 @@ export default function Cabinet({
     const currentMonth = localDate(new Date().toISOString()).slice(0, 7);
     const monthAccounting = accounting(data, { month: currentMonth });
     const visible = filtered.filter((p) => p.status === 'ACTIVE');
-    const owned = visible.filter(
-      (p) =>
-        invFor(p.id) &&
-        (!status ||
-          (status === 'stock'
-            ? invFor(p.id)!.currentQuantity > 0
-            : status === 'empty'
-              ? invFor(p.id)!.currentQuantity === 0
-              : listingCount(p.id) > 0)),
+    const owned = visible.filter((p) => {
+      const quantity = invFor(p.id)?.currentQuantity ?? 0;
+      const pending = pendingFor(p.id) + transitFor(p.id);
+      if (status === 'stock') return quantity > 0;
+      if (status === 'IN_TRANSIT') return transitFor(p.id) > 0;
+      if (status === 'empty') return quantity === 0 && pending === 0;
+      if (status) return listingCount(p.id) > 0;
+      return quantity > 0 || pending > 0;
+    });
+    const groupEntries = data.groups.flatMap((group) =>
+      group.items.map((item) => ({ group, item })),
     );
+    const groupTasks = groupEntries.filter(({ item }) => {
+      if (groupView === 'unpaid') return item.paymentStatus === 'UNPAID';
+      if (groupView === 'transit')
+        return !!item.purchase && ['PENDING', 'SHIPPED'].includes(item.purchase.arrivalStatus);
+      if (groupView === 'dispatch')
+        return (
+          item.paymentStatus === 'PAID' &&
+          item.dispatchStatus === 'NOT_DISPATCHED' &&
+          !!item.purchase &&
+          item.purchase.arrivalStatus !== 'CANCELLED'
+        );
+      return false;
+    });
     if (path === '/')
       content = (
         <>
@@ -541,6 +564,7 @@ export default function Cabinet({
                       '/groups',
                     ][i]
                   }
+                  onClick={() => setStatus(i === 0 ? 'stock' : i === 2 ? 'IN_TRANSIT' : '')}
                   aria-label={'查看' + String(label)}
                 >
                   <span className={'stat-icon tone-' + i}>
@@ -733,34 +757,34 @@ export default function Cabinet({
           </div>
           {path === '/inventory' && (
             <div className="inventory-overview-stats">
-              <article>
+              <Link href="/inventory?status=stock" onClick={() => setStatus('stock')}>
                 <span>总库存件数</span>
                 <strong>
                   {data.inventory.reduce((sum, item) => sum + item.currentQuantity, 0)}
                 </strong>
-              </article>
-              <article>
+              </Link>
+              <Link href="/purchases?status=ARRIVED" onClick={() => setStatus('ARRIVED')}>
                 <span>已到货记录</span>
                 <strong>
                   {data.purchases
                     .filter((item) => item.arrivalStatus === 'ARRIVED')
                     .reduce((sum, item) => sum + item.quantity, 0)}
                 </strong>
-              </article>
-              <article>
-                <span>待到货</span>
+              </Link>
+              <Link href="/inventory?status=IN_TRANSIT" onClick={() => setStatus('IN_TRANSIT')}>
+                <span>在路上</span>
                 <strong>
                   {data.purchases
-                    .filter((item) => ['PENDING', 'SHIPPED'].includes(item.arrivalStatus))
+                    .filter((item) => item.arrivalStatus === 'SHIPPED')
                     .reduce((sum, item) => sum + item.quantity, 0)}
                 </strong>
-              </article>
-              <article>
+              </Link>
+              <Link href="/accounting" onClick={() => setStatus('')}>
                 <span>当前库存投入</span>
                 <strong>
                   {price(data.inventory.reduce((sum, item) => sum + Number(item.currentCost), 0))}
                 </strong>
-              </article>
+              </Link>
             </div>
           )}
           {list.length ? (
@@ -778,6 +802,12 @@ export default function Cabinet({
                         ? `拥有 ×${invFor(p.id)!.currentQuantity}`
                         : '未拥有'}
                     </strong>
+                    {path === '/inventory' && pendingFor(p.id) > 0 && (
+                      <small>待派发 ×{pendingFor(p.id)}</small>
+                    )}
+                    {path === '/inventory' && transitFor(p.id) > 0 && (
+                      <small>在路上 ×{transitFor(p.id)}</small>
+                    )}
                     {path === '/inventory' && (
                       <small>
                         均价{' '}
@@ -965,11 +995,14 @@ export default function Cabinet({
             <p>和同好一起拼，更快收获喜欢的谷子！</p>
           </div>
           <div className="group-overview-stats">
-            <article>
+            <Link href="/groups?view=open" aria-current={groupView === 'open' ? 'page' : undefined}>
               <span>进行中</span>
               <strong>{data.groups.filter((group) => group.status === 'OPEN').length}</strong>
-            </article>
-            <article>
+            </Link>
+            <Link
+              href="/groups?view=unpaid"
+              aria-current={groupView === 'unpaid' ? 'page' : undefined}
+            >
               <span>待付款</span>
               <strong>
                 {
@@ -978,8 +1011,11 @@ export default function Cabinet({
                     .filter((item) => item.paymentStatus === 'UNPAID').length
                 }
               </strong>
-            </article>
-            <article>
+            </Link>
+            <Link
+              href="/groups?view=transit"
+              aria-current={groupView === 'transit' ? 'page' : undefined}
+            >
               <span>待到货</span>
               <strong>
                 {
@@ -992,8 +1028,11 @@ export default function Cabinet({
                     ).length
                 }
               </strong>
-            </article>
-            <article>
+            </Link>
+            <Link
+              href="/groups?view=dispatch"
+              aria-current={groupView === 'dispatch' ? 'page' : undefined}
+            >
               <span>待排发</span>
               <strong>
                 {
@@ -1001,74 +1040,115 @@ export default function Cabinet({
                     .flatMap((group) => group.items)
                     .filter(
                       (item) =>
+                        item.paymentStatus === 'PAID' &&
                         item.dispatchStatus === 'NOT_DISPATCHED' &&
+                        !!item.purchase &&
                         item.purchase?.arrivalStatus !== 'CANCELLED',
                     ).length
                 }
               </strong>
-            </article>
+            </Link>
           </div>
-          <div className="group-grid">
-            {data.groups
-              .filter(
-                (g) =>
-                  (!q || g.name.includes(q) || g.items.some((i) => matches(i.productId))) &&
-                  (!status || g.status === status),
-              )
-              .map((g) => (
-                <Link className="group-card" href={'/groups/' + g.id} key={g.id}>
-                  <div className="group-card-collage">
-                    {g.items.slice(0, 4).map((item) => {
-                      const product = productById(item.productId);
-                      return product ? <ProductArt key={item.id} product={product} /> : null;
-                    })}
-                    {!g.items.length && (
+          {groupView && groupView !== 'open' && (
+            <section className="group-task-panel">
+              <div className="section-heading">
+                <h2>
+                  {groupView === 'unpaid'
+                    ? '待付款项目'
+                    : groupView === 'transit'
+                      ? '待到货项目'
+                      : '待排发项目'}
+                </h2>
+                <Link href="/groups">查看全部拼团</Link>
+              </div>
+              <div className="record-list group-task-list">
+                {groupTasks.map(({ group, item }) => (
+                  <Link
+                    className="record group-task-row"
+                    href={'/groups/' + group.id}
+                    key={item.id}
+                  >
+                    <Package size={20} />
+                    <span>
+                      <strong>{productById(item.productId)?.name ?? '商品'}</strong>
+                      <small>{group.name}</small>
+                    </span>
+                    <span>{item.quantity} 件</span>
+                    <span className="pill">
+                      {groupView === 'unpaid'
+                        ? '待付款'
+                        : groupView === 'transit'
+                          ? statusNames[item.purchase?.arrivalStatus ?? 'PENDING']
+                          : '待排发'}
+                    </span>
+                    <ChevronRight size={17} />
+                  </Link>
+                ))}
+                {!groupTasks.length && empty('这里暂时没有待处理项目')}
+              </div>
+            </section>
+          )}
+          {(!groupView || groupView === 'open') && (
+            <div className="group-grid">
+              {data.groups
+                .filter(
+                  (g) =>
+                    (!q || g.name.includes(q) || g.items.some((i) => matches(i.productId))) &&
+                    (!status || g.status === status) &&
+                    (groupView !== 'open' || g.status === 'OPEN'),
+                )
+                .map((g) => (
+                  <Link className="group-card" href={'/groups/' + g.id} key={g.id}>
+                    <div className="group-card-top">
+                      <Users size={24} />
+                      <span className="pill">{statusNames[g.status]}</span>
+                    </div>
+                    <h2>{g.name}</h2>
+                    <p>团长 · {g.groupOwner}</p>
+                    <p className="group-card-items">
+                      {g.items.length
+                        ? g.items
+                            .slice(0, 3)
+                            .map((item) => productById(item.productId)?.name ?? '商品')
+                            .join(' · ')
+                        : '还没有团内商品'}
+                    </p>
+                    <div className="group-counts">
                       <span>
-                        <Users size={30} />
+                        <strong>
+                          {g.items.reduce((n, i) => n + (i.purchase?.quantity ?? i.quantity), 0)}
+                        </strong>
+                        件商品
                       </span>
-                    )}
-                  </div>
-                  <div className="group-card-top">
-                    <Users size={24} />
-                    <span className="pill">{statusNames[g.status]}</span>
-                  </div>
-                  <h2>{g.name}</h2>
-                  <p>团长 · {g.groupOwner}</p>
-                  <div className="group-counts">
-                    <span>
-                      <strong>
-                        {g.items.reduce((n, i) => n + (i.purchase?.quantity ?? i.quantity), 0)}
-                      </strong>
-                      件商品
-                    </span>
-                    <span>
-                      <strong>
-                        {g.items.filter((i) => i.purchase?.arrivalStatus !== 'ARRIVED').length}
-                      </strong>
-                      项待到货
-                    </span>
-                    <span>
-                      <strong>
-                        {g.items.filter((i) => i.dispatchStatus !== 'DISPATCHED').length}
-                      </strong>
-                      项待排发
-                    </span>
-                  </div>
-                  <div className="group-progress">
-                    <i
-                      style={{
-                        width: `${g.items.length ? Math.round((g.items.filter((item) => item.purchase?.arrivalStatus === 'ARRIVED').length / g.items.length) * 100) : 0}%`,
-                      }}
-                    />
-                  </div>
-                  <div className="group-link">
-                    看看团里的喜欢 <ArrowRight size={16} />
-                  </div>
-                </Link>
-              ))}
-            {!data.groups.length &&
-              empty('跟同好一起，等待喜欢到来', '记录拼团', () => setDialog({ type: 'group' }))}
-          </div>
+                      <span>
+                        <strong>
+                          {g.items.filter((i) => i.purchase?.arrivalStatus !== 'ARRIVED').length}
+                        </strong>
+                        项待到货
+                      </span>
+                      <span>
+                        <strong>
+                          {g.items.filter((i) => i.dispatchStatus !== 'DISPATCHED').length}
+                        </strong>
+                        项待排发
+                      </span>
+                    </div>
+                    <div className="group-progress">
+                      <i
+                        style={{
+                          width: `${g.items.length ? Math.round((g.items.filter((item) => item.purchase?.arrivalStatus === 'ARRIVED').length / g.items.length) * 100) : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="group-link">
+                      看看团里的喜欢 <ArrowRight size={16} />
+                    </div>
+                  </Link>
+                ))}
+              {!data.groups.length &&
+                empty('跟同好一起，等待喜欢到来', '记录拼团', () => setDialog({ type: 'group' }))}
+            </div>
+          )}
         </>
       );
     else if (groupDetail)
@@ -1083,7 +1163,7 @@ export default function Cabinet({
               团长 · {groupDetail.groupOwner} / {statusNames[groupDetail.status]}
             </p>
             <p className="group-sync-note">
-              登记购买会生成买入记录；确认到货后会增加收藏柜库存。删除买入记录时，对应团项也会一起删除。
+              确认付款后会记入收藏柜；派发时记录邮费并进入“在路上”，确认到货后才增加在手库存。
             </p>
             <div className="button-row">
               {groupDetail.status === 'OPEN' &&
@@ -1129,74 +1209,70 @@ export default function Cabinet({
           <div className="record-list">
             {groupDetail.items.map((i) => (
               <article className="record" key={i.id}>
-                {recordProduct(i.productId)}
+                <Link className="group-item-product" href={'/products/' + i.productId}>
+                  <Package size={20} />
+                  <strong>{productById(i.productId)?.name ?? '商品'}</strong>
+                </Link>
                 <strong>
                   {i.purchase?.quantity ?? i.quantity} 件 ·{' '}
                   {price(i.purchase?.unitPrice ?? i.unitPrice)}
                 </strong>
                 <div className="record-actions">
-                  {[
-                    ['paymentStatus', 'UNPAID', 'PAID', '未支付', '已支付'],
-                    ['shippingStatus', 'NOT_SHIPPED', 'SHIPPED', '上游未发货', '上游已发货'],
-                    ['dispatchStatus', 'NOT_DISPATCHED', 'DISPATCHED', '未排发', '已排发'],
-                  ].map(([field, off, on, offLabel, onLabel]) => {
-                    const enabled = i[field as keyof typeof i] === on;
-                    const actionKey = `group:${i.id}:${field}`;
-                    const nextLabel = enabled ? offLabel : onLabel;
-                    return (
-                      <button
-                        aria-pressed={enabled}
-                        className={`small-btn group-status-button ${enabled ? 'selected' : ''} ${
-                          pendingAction === actionKey ? 'action-pending' : ''
-                        }`}
-                        disabled={
-                          !!pendingAction || ['COMPLETED', 'CANCELLED'].includes(groupDetail.status)
-                        }
-                        key={field}
-                        onClick={() =>
-                          act(
-                            'group.item-status',
-                            { id: i.id, [field]: enabled ? off : on },
-                            `已更新为「${nextLabel}」`,
-                            actionKey,
-                          )
-                        }
-                      >
-                        {pendingAction === actionKey ? (
-                          <LoaderCircle className="button-spinner" size={14} />
-                        ) : enabled ? (
-                          <CheckCircle2 size={14} />
-                        ) : null}
-                        {pendingAction === actionKey ? '保存中…' : enabled ? onLabel : offLabel}
-                      </button>
-                    );
-                  })}
+                  {i.paymentStatus === 'PAID' && i.purchase ? (
+                    <span className="pill">已付款</span>
+                  ) : (
+                    <button
+                      className="small-btn"
+                      disabled={
+                        !!pendingAction || ['COMPLETED', 'CANCELLED'].includes(groupDetail.status)
+                      }
+                      onClick={() =>
+                        act(
+                          'group.pay',
+                          { id: i.id },
+                          '已确认付款，并同步记入收藏柜',
+                          `group:${i.id}:pay`,
+                        )
+                      }
+                    >
+                      {pendingAction === `group:${i.id}:pay` && (
+                        <LoaderCircle className="button-spinner" size={14} />
+                      )}
+                      {pendingAction === `group:${i.id}:pay` ? '同步中…' : '确认已付款'}
+                    </button>
+                  )}
+                  {i.purchase &&
+                    i.paymentStatus === 'PAID' &&
+                    i.dispatchStatus !== 'DISPATCHED' &&
+                    !['ARRIVED', 'CANCELLED'].includes(i.purchase.arrivalStatus) &&
+                    !['COMPLETED', 'CANCELLED'].includes(groupDetail.status) &&
+                    actionButton('groupDispatch', '确认已派发', i.id)}
+                  {i.dispatchStatus === 'DISPATCHED' && <span className="pill">已派发</span>}
                 </div>
-                {i.purchase ? (
+                {i.purchase && (
                   <>
                     <span className="pill">{statusNames[i.purchase.arrivalStatus]}</span>
-                    {!['ARRIVED', 'CANCELLED'].includes(i.purchase.arrivalStatus) && (
-                      <button
-                        className="small-btn"
-                        disabled={!!pendingAction}
-                        onClick={() =>
-                          act(
-                            'purchase.arrive',
-                            { id: i.purchase!.id },
-                            '已确认到货，收藏柜库存已同步增加',
-                            `group:${i.id}:arrive`,
-                          )
-                        }
-                      >
-                        {pendingAction === `group:${i.id}:arrive` && (
-                          <LoaderCircle className="button-spinner" size={14} />
-                        )}
-                        {pendingAction === `group:${i.id}:arrive` ? '入库中…' : '本人确认到货'}
-                      </button>
-                    )}
+                    {i.dispatchStatus === 'DISPATCHED' &&
+                      !['ARRIVED', 'CANCELLED'].includes(i.purchase.arrivalStatus) && (
+                        <button
+                          className="small-btn"
+                          disabled={!!pendingAction}
+                          onClick={() =>
+                            act(
+                              'purchase.arrive',
+                              { id: i.purchase!.id },
+                              '已确认到货，收藏柜库存已同步增加',
+                              `group:${i.id}:arrive`,
+                            )
+                          }
+                        >
+                          {pendingAction === `group:${i.id}:arrive` && (
+                            <LoaderCircle className="button-spinner" size={14} />
+                          )}
+                          {pendingAction === `group:${i.id}:arrive` ? '入库中…' : '确认已到货'}
+                        </button>
+                      )}
                   </>
-                ) : (
-                  actionButton('purchase', '登记购买并关联收藏', i.id, i.productId)
                 )}
               </article>
             ))}
@@ -1612,6 +1688,7 @@ export default function Cabinet({
                   path === '/inventory'
                     ? [
                         ['stock', '有货'],
+                        ['IN_TRANSIT', '在路上'],
                         ['empty', '无货'],
                         ['listed', '正在出物'],
                       ]
