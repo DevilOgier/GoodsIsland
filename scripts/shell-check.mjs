@@ -129,13 +129,13 @@ try {
   if ((await page.locator('.inventory-overview-stats > a').count()) !== 4) {
     throw Error('Inventory overview does not contain four stat cards');
   }
-  await page.getByRole('link', { name: /在路上/ }).click();
+  await page.getByRole('link', { name: /等待到货/ }).click();
   await page.waitForURL('**/inventory?status=IN_TRANSIT');
   if (
-    !(await page.getByText(/在路上 ×/).count()) &&
+    !(await page.getByText(/等待到货 ×/).count()) &&
     !(await page.locator('.ui-empty-state').count())
   )
-    throw Error('Inventory in-transit view did not apply its item filter');
+    throw Error('Inventory awaiting-arrival view did not apply its item filter');
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
   const seriesHeights = await page
     .locator('.catalog-series-grid > button')
@@ -183,6 +183,10 @@ try {
   if (!desktopPreviewBox || !desktopSettingsBox || desktopPreviewBox.x <= desktopSettingsBox.x)
     throw Error('Poster Studio is not a two-column desktop workspace');
   await page.goto('http://localhost:3000/purchases', { waitUntil: 'networkidle' });
+  if (
+    (await page.getByRole('button', { name: '列表模式' }).getAttribute('aria-pressed')) !== 'true'
+  )
+    throw Error('Purchase records should default to list mode');
   await page.getByRole('button', { name: '添加' }).click();
   const desktopPurchaseForm = page.locator('.action-form--purchase');
   await page.waitForTimeout(300);
@@ -200,6 +204,9 @@ try {
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
   const product = await db.product.findFirst();
   if (product) {
+    await page.goto(`http://localhost:3000/products/${product.id}`, { waitUntil: 'networkidle' });
+    await page.getByText('等待到货', { exact: true }).waitFor();
+    await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
     await page.getByLabel('全局搜索').fill(product.name);
     await page.locator('.app-search-results a').first().waitFor();
   }

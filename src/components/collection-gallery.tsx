@@ -19,13 +19,15 @@ export default function CollectionGallery({
   heading = '收藏一览',
   extra,
   totalCount,
+  defaultMode = 'album',
 }: {
   items: GalleryItem[];
   heading?: string;
   extra?: React.ReactNode;
   totalCount?: number;
+  defaultMode?: 'album' | 'list';
 }) {
-  const [mode, setMode] = useState<'album' | 'list'>('album');
+  const [mode, setMode] = useState<'album' | 'list'>(defaultMode);
   return (
     <section className="collection-gallery">
       <div className="gallery-heading">

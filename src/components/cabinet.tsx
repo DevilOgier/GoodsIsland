@@ -277,6 +277,7 @@ export default function Cabinet({
     data?.purchases
       .filter((purchase) => purchase.productId === id && purchase.arrivalStatus === 'SHIPPED')
       .reduce((total, purchase) => total + purchase.quantity, 0) ?? 0;
+  const awaitingArrivalFor = (id: string) => pendingFor(id) + transitFor(id);
   const listingCount = (id: string) =>
     data?.listings
       .filter((l) => l.inventory.productId === id && l.status === 'ACTIVE')
@@ -353,7 +354,9 @@ export default function Cabinet({
   function purchasesList(items: Snapshot['purchases']) {
     return (
       <CollectionGallery
+        key={path + ':' + (selected?.id ?? '')}
         heading={status === 'IN_TRANSIT' ? '等待到货' : '买入记录'}
+        defaultMode="list"
         items={items
           .filter((p) => productById(p.productId))
           .map((p) => ({
@@ -461,9 +464,9 @@ export default function Cabinet({
     const visible = filtered.filter((p) => p.status === 'ACTIVE');
     const owned = visible.filter((p) => {
       const quantity = invFor(p.id)?.currentQuantity ?? 0;
-      const pending = pendingFor(p.id) + transitFor(p.id);
+      const pending = awaitingArrivalFor(p.id);
       if (status === 'stock') return quantity > 0;
-      if (status === 'IN_TRANSIT') return transitFor(p.id) > 0;
+      if (status === 'IN_TRANSIT') return pending > 0;
       if (status === 'empty') return quantity === 0 && pending === 0;
       if (status) return listingCount(p.id) > 0;
       return quantity > 0 || pending > 0;
@@ -536,7 +539,7 @@ export default function Cabinet({
                 data.purchases
                   .filter((p) => ['PENDING', 'SHIPPED'].includes(p.arrivalStatus))
                   .reduce((n, p) => n + p.quantity, 0),
-                '件在路上',
+                '件待到货',
               ],
               [
                 Heart,
@@ -690,6 +693,13 @@ export default function Cabinet({
                   </strong>
                 </div>
                 <div>
+                  <small>等待到货</small>
+                  <strong>
+                    {awaitingArrivalFor(selected.id)}
+                    <small> 件</small>
+                  </strong>
+                </div>
+                <div>
                   <small>平均成本</small>
                   <strong>
                     {price(
@@ -772,10 +782,10 @@ export default function Cabinet({
                 </strong>
               </Link>
               <Link href="/inventory?status=IN_TRANSIT" onClick={() => setStatus('IN_TRANSIT')}>
-                <span>在路上</span>
+                <span>等待到货</span>
                 <strong>
                   {data.purchases
-                    .filter((item) => item.arrivalStatus === 'SHIPPED')
+                    .filter((item) => ['PENDING', 'SHIPPED'].includes(item.arrivalStatus))
                     .reduce((sum, item) => sum + item.quantity, 0)}
                 </strong>
               </Link>
@@ -802,11 +812,8 @@ export default function Cabinet({
                         ? `拥有 ×${invFor(p.id)!.currentQuantity}`
                         : '未拥有'}
                     </strong>
-                    {path === '/inventory' && pendingFor(p.id) > 0 && (
-                      <small>待派发 ×{pendingFor(p.id)}</small>
-                    )}
-                    {path === '/inventory' && transitFor(p.id) > 0 && (
-                      <small>在路上 ×{transitFor(p.id)}</small>
+                    {path === '/inventory' && awaitingArrivalFor(p.id) > 0 && (
+                      <small>等待到货 ×{awaitingArrivalFor(p.id)}</small>
                     )}
                     {path === '/inventory' && (
                       <small>
@@ -1688,7 +1695,7 @@ export default function Cabinet({
                   path === '/inventory'
                     ? [
                         ['stock', '有货'],
-                        ['IN_TRANSIT', '在路上'],
+                        ['IN_TRANSIT', '等待到货'],
                         ['empty', '无货'],
                         ['listed', '正在出物'],
                       ]
