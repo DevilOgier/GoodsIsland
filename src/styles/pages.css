@@ -3,47 +3,19 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
-.collection-items.album .collection-item,
-.collection-items.compact .collection-item {
+.collection-items.album .collection-item {
   transition:
     transform var(--motion-fast),
     box-shadow var(--motion-fast),
     border-color var(--motion-fast);
 }
-.collection-items.album .collection-item:hover,
-.collection-items.compact .collection-item:hover {
+.collection-items.album .collection-item:hover {
   transform: translateY(-3px);
   border-color: var(--color-line-strong);
   box-shadow: var(--shadow-card);
 }
 .collection-items.album .gallery-image .product-art {
   aspect-ratio: 1 / 0.82;
-}
-.collection-items.compact {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-}
-.collection-items.compact .gallery-info {
-  padding: 11px;
-}
-.collection-items.compact .gallery-image .product-art {
-  aspect-ratio: 1;
-}
-.collection-items.compact .gallery-info > small,
-.collection-items.compact .gallery-summary small,
-.collection-items.compact .gallery-actions {
-  display: none;
-}
-.collection-items.compact .gallery-name {
-  font-size: var(--text-sm);
-  line-height: 1.45;
-}
-.collection-items.compact .gallery-summary {
-  margin-top: 7px;
-}
-.collection-items.compact .gallery-summary strong {
-  font-size: var(--text-xs);
 }
 .inventory-overview-stats {
   display: grid;
@@ -70,11 +42,6 @@
   color: var(--color-primary);
   font-size: 1.4rem;
 }
-@media (max-width: 1180px) {
-  .collection-items.compact {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
 @media (max-width: 900px) {
   .collection-items.album {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -84,8 +51,7 @@
   }
 }
 @media (max-width: 600px) {
-  .collection-items.album,
-  .collection-items.compact {
+  .collection-items.album {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
@@ -115,8 +81,7 @@
   }
 }
 @media (hover: none) {
-  .collection-items.album .collection-item:hover,
-  .collection-items.compact .collection-item:hover {
+  .collection-items.album .collection-item:hover {
     transform: none;
     box-shadow: var(--shadow-sm);
   }
@@ -220,12 +185,24 @@
   .modal.action-form--purchaseEdit,
   .modal.action-form--sale,
   .modal.action-form--wanted {
-    width: 100vw;
+    width: 100%;
+    max-width: 100%;
     height: 100dvh;
     max-height: 100dvh;
     border-radius: 0;
     padding-inline: 18px;
     animation: transaction-page-in var(--motion-sheet) ease-out;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
+  }
+  .modal.action-form form,
+  .modal.action-form form > *,
+  .modal.action-form input,
+  .modal.action-form select,
+  .modal.action-form textarea {
+    min-width: 0;
+    max-width: 100%;
   }
   .modal.action-form > header {
     margin-inline: -18px;
@@ -581,7 +558,6 @@
     flex-direction: column;
   }
   .poster-preview-panel.poster-preview-panel {
-    order: -1;
     width: 100%;
     position: static;
     padding: 14px;

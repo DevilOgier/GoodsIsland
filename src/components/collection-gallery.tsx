@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Grid2X2, Images, List, ImageIcon } from 'lucide-react';
+import { Images, List, ImageIcon } from 'lucide-react';
 import type { Product } from './types';
 import ProductArt from './product-art';
 import { EmptyState } from './ui';
@@ -25,7 +25,7 @@ export default function CollectionGallery({
   extra?: React.ReactNode;
   totalCount?: number;
 }) {
-  const [mode, setMode] = useState<'album' | 'compact' | 'list'>('album');
+  const [mode, setMode] = useState<'album' | 'list'>('album');
   return (
     <section className="collection-gallery">
       <div className="gallery-heading">
@@ -43,15 +43,6 @@ export default function CollectionGallery({
             >
               <Images size={16} />
               <span>收藏册</span>
-            </button>
-            <button
-              aria-label="紧凑模式"
-              aria-pressed={mode === 'compact'}
-              className={mode === 'compact' ? 'selected' : ''}
-              onClick={() => setMode('compact')}
-            >
-              <Grid2X2 size={16} />
-              <span>紧凑</span>
             </button>
             <button
               aria-label="列表模式"

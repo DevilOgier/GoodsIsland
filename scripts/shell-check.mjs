@@ -83,6 +83,14 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('http://localhost:3000/', { waitUntil: 'networkidle' });
   await page.getByRole('heading', { name: /你好，岛屿测试员/ }).waitFor();
+  const dashboardDestinations = await page
+    .locator('.stats .stat-link')
+    .evaluateAll((links) => links.map((link) => link.getAttribute('href')));
+  if (
+    dashboardDestinations[0] !== '/inventory?status=stock' ||
+    dashboardDestinations[1] !== '/accounting'
+  )
+    throw Error(`Dashboard stat destinations are incorrect: ${dashboardDestinations.join('|')}`);
   const mobileLabels = await page.locator('.app-mobile-nav a').allTextContents();
   if (mobileLabels.join('|') !== '首页|图鉴|收藏柜|心愿|我的') {
     throw Error(`Unexpected mobile navigation: ${mobileLabels.join('|')}`);
@@ -105,6 +113,15 @@ try {
   if ((await mobilePurchaseForm.locator('.channel-options button').count()) !== 7) {
     throw Error('Purchase channel picker is incomplete');
   }
+  if (
+    await mobilePurchaseForm.evaluate(
+      (form) =>
+        form.scrollWidth > form.clientWidth + 1 ||
+        document.documentElement.scrollWidth > innerWidth + 1,
+    )
+  ) {
+    throw Error('Purchase form can move horizontally on mobile');
+  }
   await page.keyboard.press('Escape');
   await page.screenshot({ path: '.local/screenshots/shell-mobile-390.png', fullPage: true });
 
@@ -113,11 +130,16 @@ try {
     throw Error('Inventory overview does not contain four stat cards');
   }
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
+  const seriesHeights = await page
+    .locator('.catalog-series-grid > button')
+    .evaluateAll((cards) => cards.map((card) => Math.round(card.getBoundingClientRect().height)));
+  if (seriesHeights.length > 1 && Math.max(...seriesHeights) - Math.min(...seriesHeights) > 1)
+    throw Error(`Series cards have inconsistent heights: ${seriesHeights.join(',')}`);
   const firstSeries = page.locator('.catalog-series-grid > button').first();
   if (await firstSeries.count()) {
     await firstSeries.click();
-    await page.getByRole('button', { name: '紧凑模式' }).click();
-    await page.locator('.collection-items.compact').waitFor();
+    if ((await page.locator('.view-switch button').count()) !== 2)
+      throw Error('Catalog should expose only album and list views');
     await page.getByRole('button', { name: '列表模式' }).click();
     await page.locator('.collection-items.list').waitFor();
   }
@@ -130,8 +152,8 @@ try {
   await page.goto('http://localhost:3000/posters', { waitUntil: 'networkidle' });
   const mobilePreviewBox = await page.locator('.poster-preview-panel').boundingBox();
   const mobileSettingsBox = await page.locator('.poster-settings').boundingBox();
-  if (!mobilePreviewBox || !mobileSettingsBox || mobilePreviewBox.y >= mobileSettingsBox.y)
-    throw Error('Poster preview is not above controls on mobile');
+  if (!mobilePreviewBox || !mobileSettingsBox || mobilePreviewBox.y <= mobileSettingsBox.y)
+    throw Error('Poster preview is not below controls on mobile');
   if ((await page.locator('.template-card').count()) !== 4)
     throw Error('Poster Studio does not expose four visual templates');
 
@@ -204,14 +226,17 @@ try {
       'five-tab mobile navigation',
       '44px touch targets',
       'quick action sheet',
+      'dashboard stat destinations',
       'Dashboard greeting',
       'Inventory stats',
-      'three Catalog views',
+      'album and list Catalog views',
       'transaction drawer and mobile form',
       'purchase channel picker',
+      'mobile purchase horizontal lock',
+      'uniform Series cards',
       'mobile accounting cards',
       'Group overview cards',
-      'Poster mobile preview order',
+      'Poster mobile workflow order',
       'Poster desktop columns and templates',
       'global search',
       'six-section Admin navigation',

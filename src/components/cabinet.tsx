@@ -535,8 +535,8 @@ export default function Cabinet({
                   key={i}
                   href={
                     [
-                      '/accounting',
                       '/inventory?status=stock',
+                      '/accounting',
                       '/purchases?status=IN_TRANSIT',
                       '/groups',
                     ][i]

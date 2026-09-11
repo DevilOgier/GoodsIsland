@@ -2802,10 +2802,13 @@ body {
 .catalog-series-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: 286px;
   gap: 16px;
 }
 .catalog-series-grid > button {
   display: grid;
+  grid-template-rows: 190px minmax(0, 1fr);
+  height: 100%;
   gap: 12px;
   padding: 0 0 15px;
   overflow: hidden;
@@ -2816,6 +2819,19 @@ body {
 }
 .catalog-series-grid > button > span {
   padding: 0 15px;
+  align-content: center;
+}
+.catalog-series-grid > button > span > small,
+.catalog-series-grid > button > span > em {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.catalog-series-grid > button > span > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .catalog-collage {
   display: grid;
@@ -2922,6 +2938,7 @@ body {
   }
   .catalog-series-grid {
     grid-template-columns: 1fr;
+    grid-auto-rows: 306px;
   }
   .catalog-collage {
     grid-template-rows: repeat(2, 105px);
