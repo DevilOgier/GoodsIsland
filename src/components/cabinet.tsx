@@ -40,6 +40,7 @@ import CatalogBrowser from './catalog-browser';
 import { AppShell, appNavigation, MoreMenu } from './layout';
 import { EmptyState, Toast } from './ui';
 import type { QuickAction } from './layout/quick-action-sheet';
+import { useSnapshotIndex } from '@/hooks/use-snapshot-index';
 export default function Cabinet({
   user,
 }: {
@@ -50,6 +51,7 @@ export default function Cabinet({
   const searchParams = useSearchParams();
   const groupView = searchParams.get('view') ?? '';
   const [data, setData] = useState<Snapshot | null>(null);
+  const snapshotIndex = useSnapshotIndex(data);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{
     message: string;
@@ -250,7 +252,7 @@ export default function Cabinet({
     }
   };
   const selected = path.startsWith('/products/')
-    ? data?.products.find((p) => p.id === path.split('/')[2])
+    ? snapshotIndex?.productById.get(path.split('/')[2])
     : undefined;
   const groupDetail = path.startsWith('/groups/')
     ? data?.groups.find((g) => g.id === path.split('/')[2])
@@ -271,21 +273,10 @@ export default function Cabinet({
       (!tag || p.tags.some((t) => t.tagId === tag)) &&
       (!type || p.productType === type),
   );
-  const productById = (id: string) => all.find((p) => p.id === id);
-  const invFor = (id: string) => data?.inventory.find((i) => i.productId === id);
-  const pendingFor = (id: string) =>
-    data?.purchases
-      .filter((purchase) => purchase.productId === id && purchase.arrivalStatus === 'PENDING')
-      .reduce((total, purchase) => total + purchase.quantity, 0) ?? 0;
-  const transitFor = (id: string) =>
-    data?.purchases
-      .filter((purchase) => purchase.productId === id && purchase.arrivalStatus === 'SHIPPED')
-      .reduce((total, purchase) => total + purchase.quantity, 0) ?? 0;
-  const awaitingArrivalFor = (id: string) => pendingFor(id) + transitFor(id);
-  const listingCount = (id: string) =>
-    data?.listings
-      .filter((l) => l.inventory.productId === id && l.status === 'ACTIVE')
-      .reduce((n, l) => n + l.remainingQuantity, 0) ?? 0;
+  const productById = (id: string) => snapshotIndex?.productById.get(id);
+  const invFor = (id: string) => snapshotIndex?.inventoryByProductId.get(id);
+  const awaitingArrivalFor = (id: string) => snapshotIndex?.awaitingArrivalQuantity(id) ?? 0;
+  const listingCount = (id: string) => snapshotIndex?.activeListingQuantity(id) ?? 0;
   function cards(products: Product[], inventory = false) {
     return (
       <div className="product-grid">
@@ -732,14 +723,11 @@ export default function Cabinet({
           <section className="section-heading">
             <h2>买入与费用</h2>
           </section>
-          {purchasesList(
-            data.purchases.filter((p) => p.productId === selected.id),
-            false,
-          )}
+          {purchasesList(snapshotIndex?.purchasesByProductId.get(selected.id) ?? [], false)}
           <section className="section-heading">
             <h2>卖出记录</h2>
           </section>
-          {salesList(data.sales.filter((s) => s.productId === selected.id))}
+          {salesList(snapshotIndex?.salesByProductId.get(selected.id) ?? [])}
           <section className="section-heading">
             <h2>库存流水</h2>
           </section>

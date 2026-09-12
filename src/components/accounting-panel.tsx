@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import type { Snapshot } from './types';
 import { statusNames } from './types';
@@ -13,7 +13,15 @@ export default function AccountingPanel({ data }: { data: Snapshot }) {
     [status, setStatus] = useState('');
   const a = accounting(data, { month, ip, character, series, type, status });
   const money = (n: bigint) => '¥' + fixed(n);
-  const productName = (id: string) => data.products.find((p) => p.id === id)?.name ?? '未知商品';
+  const productById = useMemo(
+    () => new Map(data.products.map((product) => [product.id, product])),
+    [data.products],
+  );
+  const characterById = useMemo(
+    () => new Map(data.characters.map((item) => [item.id, item])),
+    [data.characters],
+  );
+  const productName = (id: string) => productById.get(id)?.name ?? '未知商品';
   function exportCSV() {
     const cell = (s: string) =>
       '"' + (/^[\s]*[=+@-]|^[\t\r\n]/.test(s) ? "'" + s : s).replaceAll('"', '""') + '"';
@@ -106,11 +114,11 @@ export default function AccountingPanel({ data }: { data: Snapshot }) {
               .filter(
                 (s) =>
                   (!character || s.characterId === character) &&
-                  (!ip || data.characters.find((c) => c.id === s.characterId)?.ipId === ip),
+                  (!ip || characterById.get(s.characterId)?.ipId === ip),
               )
               .map((s) => (
                 <option key={s.id} value={s.id}>
-                  {data.characters.find((c) => c.id === s.characterId)?.name} · {s.name}
+                  {characterById.get(s.characterId)?.name} · {s.name}
                 </option>
               ))}
           </select>

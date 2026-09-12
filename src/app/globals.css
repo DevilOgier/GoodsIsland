@@ -132,20 +132,6 @@ h3 {
   font-size: 16px;
   font-weight: 600;
 }
-.app-shell {
-  min-height: 100vh;
-}
-.sidebar {
-  width: 224px;
-  height: 100dvh;
-  position: fixed;
-  inset: 0 auto 0 0;
-  background: #fffefa;
-  border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  padding: 32px 18px 20px;
-}
 .brand {
   display: flex;
   align-items: center;
@@ -168,78 +154,6 @@ h3 {
   letter-spacing: 1.7px;
   margin-top: 3px;
 }
-.nav-label {
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: #a1a597;
-  margin: 36px 14px 12px;
-}
-.sidebar nav {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.sidebar nav a {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 9px;
-  color: #7a8273;
-  font-size: 13px;
-}
-.sidebar nav a:hover {
-  background: #f4f5ef;
-}
-.sidebar nav a.active {
-  background: #eaf0df;
-  color: #526442;
-  font-weight: 600;
-}
-.sidebar nav a:nth-child(9) {
-  margin-top: 15px;
-}
-.new-tag {
-  font-size: 8px;
-  letter-spacing: 0.6px;
-  color: #9b8e6f;
-  background: #f4eedf;
-  border-radius: 4px;
-  padding: 3px 4px;
-  margin-left: auto;
-}
-.sidebar-note {
-  margin: auto 13px 25px;
-  padding-top: 35px;
-  color: #8e987f;
-}
-.sidebar-note p {
-  line-height: 1.8;
-  margin: 9px 0;
-  font-size: 12px;
-}
-.sidebar-note span {
-  font-size: 7px;
-  letter-spacing: 1.3px;
-}
-.profile {
-  border-top: 1px solid var(--line);
-  padding-top: 18px;
-  display: flex;
-  align-items: center;
-  gap: 9px;
-}
-.profile strong {
-  font-size: 12px;
-}
-.profile small {
-  display: block;
-  font-size: 9px;
-  margin-top: 3px;
-}
-.profile .icon-btn {
-  margin-left: auto;
-}
 .avatar {
   width: 34px;
   height: 34px;
@@ -260,45 +174,6 @@ h3 {
   min-height: 32px;
   border: none;
   background: transparent;
-}
-.main {
-  margin-left: 224px;
-  min-height: 100vh;
-}
-.topbar {
-  height: 77px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid var(--line);
-  padding: 0 40px;
-  background: #fffefa99;
-}
-.breadcrumb,
-.top-right {
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  font-size: 11px;
-  color: #969c8f;
-}
-.breadcrumb strong {
-  font-weight: 400;
-  color: #5d6956;
-}
-.online-dot {
-  width: 5px;
-  height: 5px;
-  background: #809a6b;
-  border-radius: 50%;
-}
-.top-right .avatar {
-  margin-left: 10px;
-}
-.content {
-  padding: 30px 40px 0;
-  max-width: 1510px;
-  margin: 0 auto;
 }
 .eyebrow {
   display: block;
@@ -1434,19 +1309,6 @@ input::placeholder {
   }
 }
 @media (max-width: 1200px) {
-  .sidebar {
-    width: 200px;
-    padding: 25px 14px;
-  }
-  .main {
-    margin-left: 200px;
-  }
-  .content {
-    padding: 25px;
-  }
-  .topbar {
-    padding: 0 25px;
-  }
   .stat {
     padding: 17px 13px;
     gap: 10px;
@@ -1476,12 +1338,6 @@ input::placeholder {
   .hero-badge {
     left: 0;
   }
-  .sidebar-note {
-    display: none;
-  }
-  .profile {
-    margin-top: auto;
-  }
   .poster-workspace {
     grid-template-columns: 280px minmax(0, 1fr);
   }
@@ -1497,18 +1353,6 @@ input::placeholder {
   }
 }
 @media (max-width: 900px) {
-  .sidebar {
-    width: 180px;
-    padding: 24px 12px;
-  }
-  .sidebar nav a {
-    font-size: 12px;
-    gap: 9px;
-    padding: 11px;
-  }
-  .main {
-    margin-left: 180px;
-  }
   .brand {
     font-size: 23px;
   }
@@ -1517,16 +1361,6 @@ input::placeholder {
   }
   .brand small {
     font-size: 6px;
-  }
-  .content {
-    padding: 22px;
-  }
-  .topbar {
-    padding: 0 22px;
-    height: 65px;
-  }
-  .top-right > span:not(.avatar) {
-    display: none;
   }
   .product-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1627,30 +1461,6 @@ input::placeholder {
 @media (max-width: 640px) {
   body {
     font-size: 13px;
-  }
-  .sidebar {
-    display: none;
-  }
-  .main {
-    margin-left: 0;
-  }
-  .topbar {
-    height: 59px;
-    padding: 0 20px;
-    background: var(--panel);
-  }
-  .breadcrumb {
-    font-size: 10px;
-    gap: 8px;
-  }
-  .breadcrumb > span {
-    display: none;
-  }
-  .top-right {
-    gap: 0;
-  }
-  .content {
-    padding: 18px 16px 80px;
   }
   .hero {
     padding: 27px 23px;
