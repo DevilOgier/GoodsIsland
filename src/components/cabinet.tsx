@@ -4,19 +4,12 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Flower2,
-  Users,
   Search,
   Plus,
   SlidersHorizontal,
   ChevronRight,
-  Package,
-  ArrowRight,
   X,
-  Sparkles,
-  Upload,
   RefreshCw,
-  Trash2,
-  LoaderCircle,
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
 import { createSnapshotCache } from '@/lib/snapshot-cache';
@@ -26,11 +19,10 @@ import ProductArt from './product-art';
 import ActionForm from './action-form';
 import type { Dialog } from './action-form';
 import PosterEditor from './poster-editor';
-import CollectionGallery from './collection-gallery';
 import AccountingPanel from './accounting-panel';
 import AccountPanel from './account-panel';
 import { AppShell, appNavigation, MoreMenu } from './layout';
-import { EmptyState, Toast } from './ui';
+import { Toast } from './ui';
 import type { QuickAction } from './layout/quick-action-sheet';
 import { useSnapshotIndex } from '@/hooks/use-snapshot-index';
 import DashboardPage from './dashboard/dashboard-page';
@@ -39,6 +31,10 @@ import InventoryPage from './inventory/inventory-page';
 import PurchasePage, { PurchaseList } from './purchase/purchase-page';
 import SalePage, { SaleList } from './sale/sale-page';
 import WantedPage from './wanted/wanted-page';
+import ListingsPage from './listings/listings-page';
+import GroupPage from './groups/group-page';
+import GroupDetail from './groups/group-detail';
+import AdminPage, { type AdminTab } from './admin/admin-page';
 export default function Cabinet({
   user,
 }: {
@@ -66,9 +62,7 @@ export default function Cabinet({
   const [type, setType] = useState(searchParams.get('type') ?? '');
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [imageBusy, setImageBusy] = useState(false);
-  const [adminTab, setAdminTab] = useState<
-    'product' | 'ip' | 'character' | 'series' | 'productType' | 'tag'
-  >('product');
+  const [adminTab, setAdminTab] = useState<AdminTab>('product');
   const load = useCallback(
     async (force = true) => {
       try {
@@ -317,32 +311,11 @@ export default function Cabinet({
       </div>
     );
   }
-  const empty = (text: string, button?: string, onClick?: () => void) => (
-    <EmptyState
-      icon={<Flower2 size={34} strokeWidth={1.2} />}
-      title={text}
-      description="慢慢来，把每一份喜欢放进这里。"
-      action={
-        button ? (
-          <button className="primary" onClick={onClick}>
-            {button}
-            <Plus size={16} />
-          </button>
-        ) : undefined
-      }
-    />
-  );
   const matches = (id: string) => filtered.some((p) => p.id === id);
   const actionButton = (kind: string, label: string, id?: string, productId?: string) => (
     <button className="small-btn" onClick={() => setDialog({ type: kind, id, productId })}>
       {label}
     </button>
-  );
-  const recordProduct = (id: string) => (
-    <Link href={`/products/${id}`} className="record-product">
-      {productById(id) && <ProductArt product={productById(id)!} />}
-      <strong>{productById(id)?.name ?? '商品'}</strong>
-    </Link>
   );
   let content: React.ReactNode = null;
   if (data) {
@@ -535,55 +508,15 @@ export default function Cabinet({
       );
     else if (path === '/listings') {
       const entries = data.listings.filter(
-        (l) => matches(l.inventory.productId) && (!status || l.status === status),
+        (listing) => matches(listing.inventory.productId) && (!status || listing.status === status),
       );
       content = (
-        <>
-          <div className="page-intro">
-            <span className="eyebrow">PASS ON THE JOY</span>
-            <h1>正在出物</h1>
-            <p>挂出只是整理计划，确认成交后才会扣减库存。</p>
-          </div>
-          <div className="notice">
-            挂出不扣库存。选择出物记录可直接制作海报，实际成交后再扣库存。
-          </div>
-          <CollectionGallery
-            heading="出物收藏"
-            extra={
-              <Link className="primary gallery-poster-link" href="/posters?source=listings">
-                批量制作出物图
-              </Link>
-            }
-            items={entries.map((l) => ({
-              id: l.id,
-              product: productById(l.inventory.productId)!,
-              badge: statusNames[l.status],
-              summary: (
-                <>
-                  <strong>{price(l.unitPrice)} / 件</strong>
-                  <small>
-                    剩余挂出 {l.remainingQuantity} / {l.quantity} 件
-                  </small>
-                </>
-              ),
-              actions:
-                l.status === 'ACTIVE' ? (
-                  <>
-                    {actionButton('sale', '确认成交', l.id, l.inventory.productId)}
-                    <Link className="small-btn" href={'/posters?source=listings&id=' + l.id}>
-                      制作出物图
-                    </Link>
-                    <button
-                      className="small-btn"
-                      onClick={() => act('listing.cancel', { id: l.id })}
-                    >
-                      撤下
-                    </button>
-                  </>
-                ) : undefined,
-            }))}
-          />
-        </>
+        <ListingsPage
+          items={entries}
+          productFor={productById}
+          onSale={(listingId, productId) => setDialog({ type: 'sale', id: listingId, productId })}
+          onCancel={(id) => void act('listing.cancel', { id })}
+        />
       );
     } else if (path === '/wanted') {
       const entries = data.wanted.filter(
@@ -604,300 +537,37 @@ export default function Cabinet({
           onRemove={(id, name) => void removeWanted(id, name)}
         />
       );
-    } else if (path === '/groups')
-      content = (
-        <>
-          <div className="page-intro">
-            <span className="eyebrow">COLLECT TOGETHER</span>
-            <h1>我的拼团 🌿</h1>
-            <p>和同好一起拼，更快收获喜欢的谷子！</p>
-          </div>
-          <div className="group-overview-stats">
-            <Link href="/groups?view=open" aria-current={groupView === 'open' ? 'page' : undefined}>
-              <span>进行中</span>
-              <strong>{data.groups.filter((group) => group.status === 'OPEN').length}</strong>
-            </Link>
-            <Link
-              href="/groups?view=unpaid"
-              aria-current={groupView === 'unpaid' ? 'page' : undefined}
-            >
-              <span>待付款</span>
-              <strong>
-                {
-                  data.groups
-                    .flatMap((group) => group.items)
-                    .filter((item) => item.paymentStatus === 'UNPAID').length
-                }
-              </strong>
-            </Link>
-            <Link
-              href="/groups?view=transit"
-              aria-current={groupView === 'transit' ? 'page' : undefined}
-            >
-              <span>待到货</span>
-              <strong>
-                {
-                  data.groups
-                    .flatMap((group) => group.items)
-                    .filter(
-                      (item) =>
-                        item.purchase &&
-                        !['ARRIVED', 'CANCELLED'].includes(item.purchase.arrivalStatus),
-                    ).length
-                }
-              </strong>
-            </Link>
-            <Link
-              href="/groups?view=dispatch"
-              aria-current={groupView === 'dispatch' ? 'page' : undefined}
-            >
-              <span>待排发</span>
-              <strong>
-                {
-                  data.groups
-                    .flatMap((group) => group.items)
-                    .filter(
-                      (item) =>
-                        item.paymentStatus === 'PAID' &&
-                        item.dispatchStatus === 'NOT_DISPATCHED' &&
-                        !!item.purchase &&
-                        item.purchase?.arrivalStatus !== 'CANCELLED',
-                    ).length
-                }
-              </strong>
-            </Link>
-          </div>
-          {groupView && groupView !== 'open' && (
-            <section className="group-task-panel">
-              <div className="section-heading">
-                <h2>
-                  {groupView === 'unpaid'
-                    ? '待付款项目'
-                    : groupView === 'transit'
-                      ? '待到货项目'
-                      : '待排发项目'}
-                </h2>
-                <Link href="/groups">查看全部拼团</Link>
-              </div>
-              <div className="record-list group-task-list">
-                {groupTasks.map(({ group, item }) => (
-                  <Link
-                    className="record group-task-row"
-                    href={'/groups/' + group.id}
-                    key={item.id}
-                  >
-                    <Package size={20} />
-                    <span>
-                      <strong>{productById(item.productId)?.name ?? '商品'}</strong>
-                      <small>{group.name}</small>
-                    </span>
-                    <span>{item.quantity} 件</span>
-                    <span className="pill">
-                      {groupView === 'unpaid'
-                        ? '待付款'
-                        : groupView === 'transit'
-                          ? statusNames[item.purchase?.arrivalStatus ?? 'PENDING']
-                          : '待排发'}
-                    </span>
-                    <ChevronRight size={17} />
-                  </Link>
-                ))}
-                {!groupTasks.length && empty('这里暂时没有待处理项目')}
-              </div>
-            </section>
-          )}
-          {(!groupView || groupView === 'open') && (
-            <div className="group-grid">
-              {data.groups
-                .filter(
-                  (g) =>
-                    (!q || g.name.includes(q) || g.items.some((i) => matches(i.productId))) &&
-                    (!status || g.status === status) &&
-                    (groupView !== 'open' || g.status === 'OPEN'),
-                )
-                .map((g) => (
-                  <Link className="group-card" href={'/groups/' + g.id} key={g.id}>
-                    <div className="group-card-top">
-                      <Users size={24} />
-                      <span className="pill">{statusNames[g.status]}</span>
-                    </div>
-                    <h2>{g.name}</h2>
-                    <p>团长 · {g.groupOwner}</p>
-                    <p className="group-card-items">
-                      {g.items.length
-                        ? g.items
-                            .slice(0, 3)
-                            .map((item) => productById(item.productId)?.name ?? '商品')
-                            .join(' · ')
-                        : '还没有团内商品'}
-                    </p>
-                    <div className="group-counts">
-                      <span>
-                        <strong>
-                          {g.items.reduce((n, i) => n + (i.purchase?.quantity ?? i.quantity), 0)}
-                        </strong>
-                        件商品
-                      </span>
-                      <span>
-                        <strong>
-                          {g.items.filter((i) => i.purchase?.arrivalStatus !== 'ARRIVED').length}
-                        </strong>
-                        项待到货
-                      </span>
-                      <span>
-                        <strong>
-                          {g.items.filter((i) => i.dispatchStatus !== 'DISPATCHED').length}
-                        </strong>
-                        项待排发
-                      </span>
-                    </div>
-                    <div className="group-progress">
-                      <i
-                        style={{
-                          width: `${g.items.length ? Math.round((g.items.filter((item) => item.purchase?.arrivalStatus === 'ARRIVED').length / g.items.length) * 100) : 0}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="group-link">
-                      看看团里的喜欢 <ArrowRight size={16} />
-                    </div>
-                  </Link>
-                ))}
-              {!data.groups.length &&
-                empty('跟同好一起，等待喜欢到来', '记录拼团', () => setDialog({ type: 'group' }))}
-            </div>
-          )}
-        </>
+    } else if (path === '/groups') {
+      const groups = data.groups.filter(
+        (group) =>
+          (!q || group.name.includes(q) || group.items.some((item) => matches(item.productId))) &&
+          (!status || group.status === status) &&
+          (groupView !== 'open' || group.status === 'OPEN'),
       );
-    else if (groupDetail)
       content = (
-        <>
-          <div className="page-intro">
-            <Link className="back-link" href="/groups">
-              ← 我的拼团
-            </Link>
-            <h1>{groupDetail.name}</h1>
-            <p>
-              团长 · {groupDetail.groupOwner} / {statusNames[groupDetail.status]}
-            </p>
-            <p className="group-sync-note">
-              确认付款后会记入收藏柜；派发时记录邮费并进入“在路上”，确认到货后才增加在手库存。
-            </p>
-            <div className="button-row">
-              {groupDetail.status === 'OPEN' &&
-                actionButton('groupItem', '添加团项', groupDetail.id)}
-              {groupDetail.status === 'OPEN' && (
-                <button
-                  disabled={!!pendingAction}
-                  onClick={() =>
-                    act(
-                      'group.status',
-                      { id: groupDetail.id, status: 'CLOSED' },
-                      '已截团，团项仍可继续更新物流状态',
-                      `group:${groupDetail.id}:close`,
-                    )
-                  }
-                >
-                  {pendingAction === `group:${groupDetail.id}:close` && (
-                    <LoaderCircle className="button-spinner" size={15} />
-                  )}
-                  {pendingAction === `group:${groupDetail.id}:close` ? '截团中…' : '截团'}
-                </button>
-              )}
-              {groupDetail.status === 'CLOSED' && (
-                <button
-                  disabled={!!pendingAction}
-                  onClick={() =>
-                    act(
-                      'group.status',
-                      { id: groupDetail.id, status: 'COMPLETED' },
-                      '拼团已完成并保存',
-                      `group:${groupDetail.id}:complete`,
-                    )
-                  }
-                >
-                  {pendingAction === `group:${groupDetail.id}:complete` && (
-                    <LoaderCircle className="button-spinner" size={15} />
-                  )}
-                  {pendingAction === `group:${groupDetail.id}:complete` ? '保存中…' : '完成拼团'}
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="record-list">
-            {groupDetail.items.map((i) => (
-              <article className="record" key={i.id}>
-                <Link className="group-item-product" href={'/products/' + i.productId}>
-                  <Package size={20} />
-                  <strong>{productById(i.productId)?.name ?? '商品'}</strong>
-                </Link>
-                <strong>
-                  {i.purchase?.quantity ?? i.quantity} 件 ·{' '}
-                  {price(i.purchase?.unitPrice ?? i.unitPrice)}
-                </strong>
-                <div className="record-actions">
-                  {i.paymentStatus === 'PAID' && i.purchase ? (
-                    <span className="pill">已付款</span>
-                  ) : (
-                    <button
-                      className="small-btn"
-                      disabled={
-                        !!pendingAction || ['COMPLETED', 'CANCELLED'].includes(groupDetail.status)
-                      }
-                      onClick={() =>
-                        act(
-                          'group.pay',
-                          { id: i.id },
-                          '已确认付款，并同步记入收藏柜',
-                          `group:${i.id}:pay`,
-                        )
-                      }
-                    >
-                      {pendingAction === `group:${i.id}:pay` && (
-                        <LoaderCircle className="button-spinner" size={14} />
-                      )}
-                      {pendingAction === `group:${i.id}:pay` ? '同步中…' : '确认已付款'}
-                    </button>
-                  )}
-                  {i.purchase &&
-                    i.paymentStatus === 'PAID' &&
-                    i.dispatchStatus !== 'DISPATCHED' &&
-                    !['ARRIVED', 'CANCELLED'].includes(i.purchase.arrivalStatus) &&
-                    !['COMPLETED', 'CANCELLED'].includes(groupDetail.status) &&
-                    actionButton('groupDispatch', '确认已派发', i.id)}
-                  {i.dispatchStatus === 'DISPATCHED' && <span className="pill">已派发</span>}
-                </div>
-                {i.purchase && (
-                  <>
-                    <span className="pill">{statusNames[i.purchase.arrivalStatus]}</span>
-                    {i.dispatchStatus === 'DISPATCHED' &&
-                      !['ARRIVED', 'CANCELLED'].includes(i.purchase.arrivalStatus) && (
-                        <button
-                          className="small-btn"
-                          disabled={!!pendingAction}
-                          onClick={() =>
-                            act(
-                              'purchase.arrive',
-                              { id: i.purchase!.id },
-                              '已确认到货，收藏柜库存已同步增加',
-                              `group:${i.id}:arrive`,
-                            )
-                          }
-                        >
-                          {pendingAction === `group:${i.id}:arrive` && (
-                            <LoaderCircle className="button-spinner" size={14} />
-                          )}
-                          {pendingAction === `group:${i.id}:arrive` ? '入库中…' : '确认已到货'}
-                        </button>
-                      )}
-                  </>
-                )}
-              </article>
-            ))}
-          </div>
-        </>
+        <GroupPage
+          data={data}
+          groups={groups}
+          tasks={groupTasks}
+          view={groupView}
+          productFor={productById}
+          onCreate={() => setDialog({ type: 'group' })}
+        />
       );
-    else if (path.startsWith('/posters'))
+    } else if (groupDetail) {
+      content = (
+        <GroupDetail
+          group={groupDetail}
+          pendingAction={pendingAction}
+          productFor={productById}
+          onAction={(operation, payload, message, key) =>
+            void act(operation, payload, message, key)
+          }
+          onAddItem={() => setDialog({ type: 'groupItem', id: groupDetail.id })}
+          onDispatch={(id) => setDialog({ type: 'groupDispatch', id })}
+        />
+      );
+    } else if (path.startsWith('/posters'))
       content = (
         <PosterEditor
           key={searchParams.toString()}
@@ -910,251 +580,18 @@ export default function Cabinet({
     else if (path === '/accounting') content = <AccountingPanel data={data} />;
     else if (path === '/admin')
       content = (
-        <>
-          <div className="page-intro">
-            <span className="eyebrow">CURATE YOUR ENCYCLOPEDIA</span>
-            <h1>整理图鉴里的喜欢</h1>
-            <p>上传商品图、维护系列和类型，名称会自动组合。</p>
-            <div className="button-row">
-              {actionButton('product', '添加商品')}
-              {actionButton('productType', '新增谷子类型')}
-              {actionButton('entity', '添加 IP / 角色 / 系列 / 标签')}
-            </div>
-          </div>
-          <nav className="admin-tabs" aria-label="图鉴管理分类">
-            {(
-              [
-                ['product', '商品'],
-                ['ip', 'IP'],
-                ['character', '角色'],
-                ['series', '系列'],
-                ['productType', '谷子类型'],
-                ['tag', '标签'],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                aria-current={adminTab === key ? 'page' : undefined}
-                onClick={() => setAdminTab(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="record-list admin-product-list" hidden={adminTab !== 'product'}>
-            {filtered.map((p) => (
-              <article className="record" key={p.id}>
-                {recordProduct(p.id)}
-                <span>
-                  {p.series.character.name} / {p.series.name}
-                </span>
-                <span className="pill">{p.status === 'ACTIVE' ? '展示中' : '已归档'}</span>
-                {actionButton('productEdit', '编辑', p.id)}
-                <div className="catalog-image-controls">
-                  <button
-                    className="small-btn"
-                    disabled={
-                      imageBusy ||
-                      !p.originalId ||
-                      data.jobs.some(
-                        (j) => j.productId === p.id && ['RUNNING', 'QUEUED'].includes(j.status),
-                      )
-                    }
-                    onClick={() => imageAction('enhance', p.id)}
-                  >
-                    <Sparkles size={14} />
-                    保真高清{data.provider === 'mock' ? '（模拟）' : ''}
-                  </button>
-                  <button
-                    className="small-btn"
-                    disabled={imageBusy || !p.originalId}
-                    onClick={() => imageAction('select', p.id, 'ORIGINAL')}
-                  >
-                    使用原图
-                  </button>
-                  {p.enhancedId && (
-                    <button
-                      className="small-btn"
-                      disabled={imageBusy}
-                      onClick={() => imageAction('select', p.id, 'ENHANCED')}
-                    >
-                      使用高清图
-                    </button>
-                  )}
-                  {data.jobs
-                    .filter((j) => j.productId === p.id)
-                    .slice(0, 1)
-                    .map((j) => (
-                      <small key={j.id}>
-                        {statusNames[j.status]} {j.error}
-                        {j.status === 'FAILED' && (
-                          <button onClick={() => imageAction('retry', j.id)}>重试</button>
-                        )}
-                      </small>
-                    ))}
-                </div>
-                <label className="upload-button">
-                  <Upload size={16} />
-                  {imageBusy ? '上传中…' : '上传图片'}
-                  <input
-                    aria-label={'上传图片 ' + p.name}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    disabled={imageBusy}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void upload(file, p.id);
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-                <button
-                  className="small-btn"
-                  onClick={() =>
-                    act('catalog.archive', {
-                      id: p.id,
-                      status: p.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE',
-                    })
-                  }
-                >
-                  {p.status === 'ACTIVE' ? '归档' : '恢复'}
-                </button>
-                <button
-                  className="small-btn danger"
-                  aria-label={'删除商品 ' + p.name}
-                  onClick={() => void removeCatalog('product', p.id, p.name)}
-                >
-                  <Trash2 size={14} /> 删除
-                </button>
-              </article>
-            ))}
-            {!filtered.length &&
-              empty('图鉴里还没有符合条件的谷子', '添加第一款谷子', () =>
-                setDialog({ type: 'product' }),
-              )}
-          </div>
-          <section className="catalog-taxonomy" hidden={adminTab === 'product'}>
-            <div className="section-heading">
-              <div>
-                <span className="eyebrow">CATALOG STRUCTURE</span>
-                <h2>
-                  {adminTab === 'productType'
-                    ? '谷子类型管理'
-                    : adminTab === 'tag'
-                      ? '标签管理'
-                      : `${adminTab === 'ip' ? 'IP' : adminTab === 'character' ? '角色' : '系列'}管理`}
-                </h2>
-              </div>
-              <p>删除 IP、角色或系列会同时删除其下没有图片和业务记录的图鉴内容。</p>
-            </div>
-            <div className="taxonomy-grid">
-              <article hidden={adminTab !== 'ip'}>
-                <h3>IP</h3>
-                {data.ips.map((item) => (
-                  <div className="taxonomy-row" key={item.id}>
-                    <span>{item.name}</span>
-                    <button
-                      className="small-btn danger"
-                      aria-label={'删除 IP ' + item.name}
-                      onClick={() => void removeCatalog('ip', item.id, item.name)}
-                    >
-                      <Trash2 size={14} /> 删除
-                    </button>
-                  </div>
-                ))}
-                {!data.ips.length && <small className="muted">暂无 IP</small>}
-              </article>
-              <article hidden={adminTab !== 'character'}>
-                <h3>角色</h3>
-                {data.characters.map((item) => (
-                  <div className="taxonomy-row" key={item.id}>
-                    <span>
-                      <small>{data.ips.find((ip) => ip.id === item.ipId)?.name}</small>
-                      {item.name}
-                    </span>
-                    <button
-                      className="small-btn danger"
-                      aria-label={'删除角色 ' + item.name}
-                      onClick={() => void removeCatalog('character', item.id, item.name)}
-                    >
-                      <Trash2 size={14} /> 删除
-                    </button>
-                  </div>
-                ))}
-                {!data.characters.length && <small className="muted">暂无角色</small>}
-              </article>
-              <article hidden={adminTab !== 'series'}>
-                <h3>系列</h3>
-                {data.series.map((item) => (
-                  <div className="taxonomy-row" key={item.id}>
-                    <span>
-                      <small>
-                        {
-                          data.characters.find((character) => character.id === item.characterId)
-                            ?.name
-                        }
-                      </small>
-                      {item.name}
-                    </span>
-                    <button
-                      className="small-btn danger"
-                      aria-label={'删除系列 ' + item.name}
-                      onClick={() => void removeCatalog('series', item.id, item.name)}
-                    >
-                      <Trash2 size={14} /> 删除
-                    </button>
-                  </div>
-                ))}
-                {!data.series.length && <small className="muted">暂无系列</small>}
-              </article>
-              <article hidden={!['productType', 'tag'].includes(adminTab)}>
-                <h3>{adminTab === 'productType' ? '自定义谷子类型' : '标签'}</h3>
-                {adminTab === 'productType' &&
-                  data.productTypes
-                    .filter((item) => item.key.startsWith('CUSTOM_'))
-                    .map((item) => (
-                      <div className="taxonomy-row" key={item.key}>
-                        <span>
-                          <small>类型</small>
-                          {item.name}
-                        </span>
-                        <button
-                          className="small-btn danger"
-                          aria-label={'删除类型 ' + item.name}
-                          onClick={() => void removeCatalog('productType', item.key, item.name)}
-                        >
-                          <Trash2 size={14} /> 删除
-                        </button>
-                      </div>
-                    ))}
-                {adminTab === 'tag' &&
-                  data.tags.map((item) => (
-                    <div className="taxonomy-row" key={item.id}>
-                      <span>
-                        <small>标签</small>
-                        {item.name}
-                      </span>
-                      <button
-                        className="small-btn danger"
-                        aria-label={'删除标签 ' + item.name}
-                        onClick={() => void removeCatalog('tag', item.id, item.name)}
-                      >
-                        <Trash2 size={14} /> 删除
-                      </button>
-                    </div>
-                  ))}
-                {adminTab === 'tag' && !data.tags.length && (
-                  <small className="muted">暂无标签</small>
-                )}
-                {adminTab === 'productType' &&
-                  !data.productTypes.some((item) => item.key.startsWith('CUSTOM_')) && (
-                    <small className="muted">暂无自定义谷子类型</small>
-                  )}
-              </article>
-            </div>
-          </section>
-        </>
+        <AdminPage
+          data={data}
+          products={filtered}
+          tab={adminTab}
+          imageBusy={imageBusy}
+          onTabChange={setAdminTab}
+          onOpenForm={(type, id) => setDialog({ type, id })}
+          onImageAction={(action, id, source) => void imageAction(action, id, source)}
+          onUpload={(file, productId) => void upload(file, productId)}
+          onArchive={(id, nextStatus) => void act('catalog.archive', { id, status: nextStatus })}
+          onRemove={(entity, id, name) => void removeCatalog(entity, id, name)}
+        />
       );
     else if (path === '/me')
       content = (

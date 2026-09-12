@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Palette, Save, Plus, X } from 'lucide-react';
+import { Download, Palette, Save, Plus } from 'lucide-react';
 import type { Snapshot } from './types';
 import { renderPoster, templates } from '@/poster/renderer';
 import type { PosterItemData } from '@/poster/renderer';
@@ -8,6 +8,7 @@ import { posterPrefill } from '@/domain/poster-prefill';
 import ProductPicker from './product-picker';
 import { TemplateSelector } from './poster/template-selector';
 import { PosterPreview } from './poster/poster-preview';
+import { PosterItemList } from './poster/poster-item-list';
 async function assetData(id: string) {
   const r = await fetch('/api/images/' + id);
   if (!r.ok) throw Error('商品图片加载失败');
@@ -194,56 +195,7 @@ export default function PosterEditor({
             </p>
           )}
           {imageLoading && <p className="muted">正在加载商品图片…</p>}
-          {items.map((item, i) => (
-            <div className="poster-item" key={item.productId}>
-              <div>
-                <strong>{item.name}</strong>
-                <button
-                  className="icon-btn"
-                  aria-label={'移除' + item.name}
-                  onClick={() => setItems(items.filter((_, n) => n !== i))}
-                >
-                  <X size={15} />
-                </button>
-              </div>
-              <div className="form-grid">
-                <label>
-                  数量
-                  <input
-                    aria-label={'海报数量' + i}
-                    type="number"
-                    min="1"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      setItems(
-                        items.map((v, n) =>
-                          n === i ? { ...v, quantity: Number(e.target.value) } : v,
-                        ),
-                      )
-                    }
-                  />
-                </label>
-                <label>
-                  单价
-                  <input
-                    placeholder="可议"
-                    value={item.price}
-                    onChange={(e) =>
-                      setItems(items.map((v, n) => (n === i ? { ...v, price: e.target.value } : v)))
-                    }
-                  />
-                </label>
-              </div>
-              <input
-                placeholder="备注（可选）"
-                maxLength={80}
-                value={item.note}
-                onChange={(e) =>
-                  setItems(items.map((v, n) => (n === i ? { ...v, note: e.target.value } : v)))
-                }
-              />
-            </div>
-          ))}
+          <PosterItemList items={items} onChange={setItems} />
           <TemplateSelector
             ratio={ratio}
             template={template}
