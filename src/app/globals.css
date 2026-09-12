@@ -2093,6 +2093,14 @@ input::placeholder {
   display: block;
   min-width: 0;
 }
+.gallery-open-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: inherit;
+}
 .gallery-badge {
   position: absolute;
   top: 10px;
@@ -2119,6 +2127,16 @@ input::placeholder {
   line-height: 1.7;
   display: block;
   overflow-wrap: anywhere;
+}
+.gallery-open-name {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.collection-items.list .collection-item--no-image .gallery-info {
+  width: 100%;
 }
 .gallery-summary {
   display: flex;

@@ -33,7 +33,10 @@ export default function ActionForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const purchase = data.purchases.find((p) => p.id === dialog.id);
-  const [pickedId, setPickedId] = useState(dialog.productId ?? purchase?.productId ?? '');
+  const wanted = data.wanted.find((w) => w.id === dialog.id);
+  const [pickedId, setPickedId] = useState(
+    dialog.productId ?? purchase?.productId ?? wanted?.productId ?? '',
+  );
   const [picking, setPicking] = useState(false);
   const linkedGroup =
     dialog.type === 'purchase' && dialog.id
@@ -222,6 +225,37 @@ export default function ActionForm({
         notes,
       ];
       break;
+    case 'wantedEdit':
+      if (!wanted) break;
+      title = '修改收物心愿';
+      op = 'wanted.update';
+      fields = [
+        { ...product, value: wanted.productId },
+        {
+          ...qty,
+          name: 'wantedQuantity',
+          label: '想收数量',
+          value: String(wanted.wantedQuantity),
+        },
+        {
+          ...unit,
+          name: 'targetPrice',
+          label: '心理单价（元）',
+          value: String(wanted.targetPrice ?? 0),
+        },
+        {
+          name: 'priority',
+          label: '优先级',
+          value: wanted.priority,
+          options: [
+            ['NORMAL', '慢慢收'],
+            ['HIGH', '很想拥有'],
+            ['LOW', '随缘收'],
+          ],
+        },
+        { ...notes, value: wanted.notes },
+      ];
+      break;
     case 'group':
       title = '记录一个新拼团';
       op = 'group.create';
@@ -350,6 +384,7 @@ export default function ActionForm({
             if (!payload.parentId) delete payload.parentId;
             if (dialog.type === 'productEdit') payload.id = dialog.id;
             if (dialog.type === 'purchaseEdit') payload.id = dialog.id;
+            if (dialog.type === 'wantedEdit') payload.id = dialog.id;
             if (dialog.wantedId) {
               payload.wantedId = dialog.wantedId;
               payload.updateWanted = payload.updateWanted === 'on';
@@ -402,6 +437,7 @@ export default function ActionForm({
                     aria-label="从系列图鉴选择谷子"
                     disabled={
                       (!!dialog.id && ['sale', 'purchase'].includes(dialog.type)) ||
+                      dialog.type === 'wantedEdit' ||
                       (dialog.type === 'purchaseEdit' &&
                         (purchase?.arrivalStatus === 'ARRIVED' ||
                           !!purchase?.groupBuyItemId ||

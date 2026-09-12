@@ -20,6 +20,63 @@ await db.session.create({
     expiresAt: new Date(Date.now() + 3_600_000),
   },
 });
+const shellProduct = await db.product.findFirst();
+if (shellProduct) {
+  await db.purchase.create({
+    data: {
+      userId: user.id,
+      productId: shellProduct.id,
+      quantity: 1,
+      unitPrice: '10',
+      productAmount: '10',
+      domesticShipping: '0',
+      internationalShipping: '0',
+      otherFee: '0',
+      actualCost: '10',
+      purchaseChannel: '测试',
+      purchaseDate: new Date('2026-09-11'),
+      arrivalStatus: 'PENDING',
+      notes: '',
+    },
+  });
+  await db.sale.create({
+    data: {
+      userId: user.id,
+      productId: shellProduct.id,
+      quantity: 1,
+      unitPrice: '12',
+      totalAmount: '12',
+      allocatedActualCost: '10',
+      saleChannel: '测试',
+      saleDate: new Date('2026-09-11'),
+      notes: '',
+    },
+  });
+  await db.wanted.createMany({
+    data: [
+      {
+        userId: user.id,
+        productId: shellProduct.id,
+        wantedQuantity: 2,
+        fulfilledQuantity: 0,
+        targetPrice: '15',
+        priority: 'NORMAL',
+        status: 'WANTED',
+        notes: '界面测试',
+      },
+      {
+        userId: user.id,
+        productId: shellProduct.id,
+        wantedQuantity: 1,
+        fulfilledQuantity: 1,
+        targetPrice: '15',
+        priority: 'NORMAL',
+        status: 'FULFILLED',
+        notes: '应当隐藏',
+      },
+    ],
+  });
+}
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -126,6 +183,10 @@ try {
   await page.screenshot({ path: '.local/screenshots/shell-mobile-390.png', fullPage: true });
 
   await page.goto('http://localhost:3000/inventory', { waitUntil: 'networkidle' });
+  if (
+    (await page.getByRole('button', { name: /周边类型/ }).getAttribute('aria-pressed')) !== 'true'
+  )
+    throw Error('Inventory should default to merchandise type view');
   if ((await page.locator('.inventory-overview-stats > a').count()) !== 4) {
     throw Error('Inventory overview does not contain four stat cards');
   }
@@ -133,10 +194,16 @@ try {
   await page.waitForURL('**/inventory?status=IN_TRANSIT');
   if (
     !(await page.getByText(/等待到货 ×/).count()) &&
+    !(await page.locator('.catalog-type-list > button').count()) &&
     !(await page.locator('.ui-empty-state').count())
   )
     throw Error('Inventory awaiting-arrival view did not apply its item filter');
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
+  if (
+    (await page.getByRole('button', { name: /周边类型/ }).getAttribute('aria-pressed')) !== 'true'
+  )
+    throw Error('Catalog should default to merchandise type view');
+  await page.getByRole('button', { name: /周边系列/ }).click();
   const seriesHeights = await page
     .locator('.catalog-series-grid > button')
     .evaluateAll((cards) => cards.map((card) => Math.round(card.getBoundingClientRect().height)));
@@ -201,11 +268,27 @@ try {
     );
   }
   await desktopPurchaseForm.getByRole('button', { name: '关闭' }).click();
+  await page.goto('http://localhost:3000/sales', { waitUntil: 'networkidle' });
+  if (!(await page.locator('.record-list .record').count()))
+    throw Error('Sale records should render as a list');
+  await page.goto('http://localhost:3000/wanted', { waitUntil: 'networkidle' });
+  if (shellProduct) {
+    if ((await page.locator('.collection-item').count()) !== 1)
+      throw Error('Fulfilled wanted items should be hidden');
+    await page.locator('.gallery-open-name').click();
+    await page.locator('.action-form--wantedEdit').waitFor();
+    await page.getByRole('button', { name: '关闭' }).click();
+  }
   await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
-  const product = await db.product.findFirst();
+  const product = shellProduct;
   if (product) {
     await page.goto(`http://localhost:3000/products/${product.id}`, { waitUntil: 'networkidle' });
     await page.getByText('等待到货', { exact: true }).waitFor();
+    if (
+      !(await page.locator('.collection-item--no-image').count()) ||
+      (await page.locator('.collection-item--no-image .gallery-image').count())
+    )
+      throw Error('Product detail purchase history should not repeat product imagery');
     await page.goto('http://localhost:3000/products', { waitUntil: 'networkidle' });
     await page.getByLabel('全局搜索').fill(product.name);
     await page.locator('.app-search-results a').first().waitFor();
@@ -279,6 +362,9 @@ try {
   console.log('Shell browser checks: PASS (6 viewports, 11 routes, interactions, PWA)');
 } finally {
   await browser.close();
+  await db.wanted.deleteMany({ where: { userId: user.id } });
+  await db.sale.deleteMany({ where: { userId: user.id } });
+  await db.purchase.deleteMany({ where: { userId: user.id } });
   await db.session.deleteMany({ where: { userId: user.id } });
   await db.user.delete({ where: { id: user.id } });
   await db.$disconnect();

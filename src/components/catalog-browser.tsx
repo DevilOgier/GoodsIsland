@@ -22,7 +22,7 @@ export default function CatalogBrowser({
   heading: string;
   inventory?: boolean;
 }) {
-  const [granularity, setGranularity] = useState<Granularity>('series');
+  const [granularity, setGranularity] = useState<Granularity>('type');
   const [selected, setSelected] = useState('');
   const [page, setPage] = useState(1);
   const groups = useMemo(() => {

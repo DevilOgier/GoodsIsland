@@ -13,6 +13,7 @@ export type GalleryItem = {
   actions?: React.ReactNode;
   details?: React.ReactNode;
   quantity?: number;
+  onOpen?: () => void;
 };
 export default function CollectionGallery({
   items,
@@ -20,12 +21,14 @@ export default function CollectionGallery({
   extra,
   totalCount,
   defaultMode = 'album',
+  showImages = true,
 }: {
   items: GalleryItem[];
   heading?: string;
   extra?: React.ReactNode;
   totalCount?: number;
   defaultMode?: 'album' | 'list';
+  showImages?: boolean;
 }) {
   const [mode, setMode] = useState<'album' | 'list'>(defaultMode);
   return (
@@ -67,18 +70,44 @@ export default function CollectionGallery({
       ) : (
         <div className={'collection-items ' + mode}>
           {items.map((item) => (
-            <article key={item.id} className="collection-item">
-              <Link className="gallery-image" href={'/products/' + item.product.id}>
-                <ProductArt product={item.product} />
-                {item.badge && <span className="gallery-badge">{item.badge}</span>}
-              </Link>
+            <article
+              key={item.id}
+              className={'collection-item' + (showImages ? '' : ' collection-item--no-image')}
+            >
+              {showImages &&
+                (item.onOpen ? (
+                  <button
+                    type="button"
+                    className="gallery-image gallery-open-button"
+                    onClick={item.onOpen}
+                  >
+                    <ProductArt product={item.product} />
+                    {item.badge && <span className="gallery-badge">{item.badge}</span>}
+                  </button>
+                ) : (
+                  <Link className="gallery-image" href={'/products/' + item.product.id}>
+                    <ProductArt product={item.product} />
+                    {item.badge && <span className="gallery-badge">{item.badge}</span>}
+                  </Link>
+                ))}
               <div className="gallery-info">
                 <small>
                   {item.product.series.character.name} · {item.product.series.name}
                 </small>
-                <Link className="gallery-name" href={'/products/' + item.product.id}>
-                  {item.product.name}
-                </Link>
+                {item.onOpen ? (
+                  <button
+                    type="button"
+                    className="gallery-name gallery-open-name"
+                    onClick={item.onOpen}
+                  >
+                    {item.product.name}
+                  </button>
+                ) : (
+                  <Link className="gallery-name" href={'/products/' + item.product.id}>
+                    {item.product.name}
+                  </Link>
+                )}
+                {!showImages && item.badge && <span className="pill">{item.badge}</span>}
                 <div className="gallery-summary">{item.summary}</div>
                 <div className="gallery-actions">{item.actions}</div>
                 {item.details}

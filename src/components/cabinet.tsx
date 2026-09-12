@@ -195,6 +195,10 @@ export default function Cabinet({
       return;
     await act('purchase.delete', { id }, '买入记录已删除，库存与关联拼团已同步');
   };
+  const removeWanted = async (id: string, name: string) => {
+    if (!window.confirm(`确定删除「${name}」的收物心愿吗？`)) return;
+    await act('wanted.delete', { id }, '收物心愿已删除');
+  };
   const imageAction = async (action: string, id: string, source?: string) => {
     setImageBusy(true);
     try {
@@ -351,12 +355,13 @@ export default function Cabinet({
       <strong>{productById(id)?.name ?? '商品'}</strong>
     </Link>
   );
-  function purchasesList(items: Snapshot['purchases']) {
+  function purchasesList(items: Snapshot['purchases'], showImages = true) {
     return (
       <CollectionGallery
         key={path + ':' + (selected?.id ?? '')}
         heading={status === 'IN_TRANSIT' ? '等待到货' : '买入记录'}
         defaultMode="list"
+        showImages={showImages}
         items={items
           .filter((p) => productById(p.productId))
           .map((p) => ({
@@ -727,7 +732,10 @@ export default function Cabinet({
           <section className="section-heading">
             <h2>买入与费用</h2>
           </section>
-          {purchasesList(data.purchases.filter((p) => p.productId === selected.id))}
+          {purchasesList(
+            data.purchases.filter((p) => p.productId === selected.id),
+            false,
+          )}
           <section className="section-heading">
             <h2>卖出记录</h2>
           </section>
@@ -932,9 +940,9 @@ export default function Cabinet({
     } else if (path === '/wanted') {
       const entries = data.wanted.filter(
         (w) =>
+          ['WANTED', 'PARTIAL'].includes(w.status) &&
           matches(w.productId) &&
-          (!status ||
-            (status === 'ACTIVE' ? ['WANTED', 'PARTIAL'].includes(w.status) : w.status === status)),
+          (!status || status === 'ACTIVE' || w.status === status),
       );
       content = (
         <>
@@ -953,6 +961,7 @@ export default function Cabinet({
             items={entries.map((w) => ({
               id: w.id,
               product: productById(w.productId)!,
+              onOpen: () => setDialog({ type: 'wantedEdit', id: w.id }),
               badge: statusNames[w.status],
               summary: (
                 <>
@@ -966,7 +975,7 @@ export default function Cabinet({
                   <small>{w.notes}</small>
                 </>
               ),
-              actions: !['FULFILLED', 'CANCELLED'].includes(w.status) ? (
+              actions: (
                 <>
                   <Link className="small-btn" href={'/posters?source=wanted&id=' + w.id}>
                     制作收物图
@@ -987,8 +996,20 @@ export default function Cabinet({
                   >
                     仅标记收齐
                   </button>
+                  <button
+                    className="small-btn"
+                    onClick={() => setDialog({ type: 'wantedEdit', id: w.id })}
+                  >
+                    修改
+                  </button>
+                  <button
+                    className="small-btn danger"
+                    onClick={() => void removeWanted(w.id, productById(w.productId)!.name)}
+                  >
+                    <Trash2 size={14} /> 删除
+                  </button>
                 </>
-              ) : undefined,
+              ),
             }))}
           />
         </>
@@ -1699,7 +1720,13 @@ export default function Cabinet({
                         ['empty', '无货'],
                         ['listed', '正在出物'],
                       ]
-                    : Object.entries(statusNames),
+                    : path === '/wanted'
+                      ? [
+                          ['ACTIVE', '正在收'],
+                          ['WANTED', '尚未收到'],
+                          ['PARTIAL', '部分收到'],
+                        ]
+                      : Object.entries(statusNames),
                 ],
               ].map(([label, value, setter, options]) => (
                 <label key={String(label)}>

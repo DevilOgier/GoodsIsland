@@ -108,7 +108,57 @@ async function dispatch(
         notes: z.string().max(2000).default(''),
       })
       .parse(raw);
+    const existing = await tx.wanted.findFirst({
+      where: { userId, productId: d.productId, status: { in: ['WANTED', 'PARTIAL'] } },
+    });
+    if (existing)
+      return tx.wanted.update({
+        where: { id: existing.id },
+        data: {
+          wantedQuantity: { increment: d.wantedQuantity },
+          targetPrice: d.targetPrice,
+          priority: d.priority,
+          notes: d.notes,
+        },
+      });
     return tx.wanted.create({ data: { ...d, userId } });
+  }
+  if (op === 'wanted.update') {
+    const d = z
+      .object({
+        id: z.uuid(),
+        productId: z.uuid(),
+        wantedQuantity: quantity,
+        targetPrice: amount.optional(),
+        priority: z.enum(['LOW', 'NORMAL', 'HIGH']),
+        notes: z.string().max(2000).default(''),
+      })
+      .parse(raw);
+    const w = await tx.wanted.findFirst({ where: { id: d.id, userId } });
+    ensure(w, '收物不存在', 404);
+    ensure(w.productId === d.productId, '不能更换心愿商品');
+    ensure(d.wantedQuantity >= w.fulfilledQuantity, '想收数量不能少于已收数量');
+    return tx.wanted.update({
+      where: { id: w.id },
+      data: {
+        wantedQuantity: d.wantedQuantity,
+        targetPrice: d.targetPrice,
+        priority: d.priority,
+        notes: d.notes,
+        status:
+          d.wantedQuantity === w.fulfilledQuantity
+            ? 'FULFILLED'
+            : w.fulfilledQuantity
+              ? 'PARTIAL'
+              : 'WANTED',
+      },
+    });
+  }
+  if (op === 'wanted.delete') {
+    const { id } = z.object({ id: z.uuid() }).parse(raw);
+    const w = await tx.wanted.findFirst({ where: { id, userId } });
+    ensure(w, '收物不存在', 404);
+    return tx.wanted.delete({ where: { id: w.id } });
   }
   if (op === 'wanted.progress') {
     const d = z
