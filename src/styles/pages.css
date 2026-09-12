@@ -640,3 +640,263 @@
     box-shadow: var(--shadow-sm);
   }
 }
+
+/* Poster picker performance */
+.series-tile,
+.picker-product {
+  content-visibility: auto;
+  contain-intrinsic-size: 280px 340px;
+}
+
+.picker-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.picker-pagination button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 40px;
+}
+
+.picker-pagination span {
+  min-width: 54px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* Poster Studio V3 */
+.template-options--poster.template-options--poster {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.template-options--poster .template-card--poster {
+  min-height: 0;
+  padding: 8px;
+  gap: 5px;
+  background: var(--color-surface);
+}
+
+.template-card__preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface-soft);
+}
+
+.template-card__preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.template-card--poster strong {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.template-card--poster small {
+  min-height: 30px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.template-card--poster em {
+  color: var(--color-primary);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.poster-style-options {
+  display: grid;
+}
+
+.palette-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.palette-options button {
+  display: grid;
+  grid-template-columns: 17px 17px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  min-height: 42px;
+  padding: 8px;
+  font-size: 11px;
+  text-align: left;
+}
+
+.palette-options i {
+  display: block;
+  width: 17px;
+  height: 17px;
+  border: 2px solid rgb(255 255 255 / 78%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--color-line);
+}
+
+.poster-option-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.poster-option-row button {
+  min-width: 0;
+  min-height: 42px;
+  padding: 7px 4px;
+  font-size: 10px;
+}
+
+.poster-option-row button.selected,
+.palette-options button.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.poster-note-toggle.poster-note-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.poster-note-toggle input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+}
+
+.poster-item__heading {
+  display: grid !important;
+  grid-template-columns: 42px minmax(0, 1fr) 34px;
+  gap: 10px;
+  align-items: center;
+}
+
+.poster-item__heading strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poster-item__art {
+  position: relative;
+  display: block;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--color-surface-soft);
+}
+
+.poster-item__art i {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgb(255 255 255 / 75%) 48%, transparent 76%);
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.35s linear infinite;
+}
+
+.poster-item__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+@media (max-width: 840px) {
+  .template-options--poster.template-options--poster {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 2px 2px 10px;
+    scroll-snap-type: x proximity;
+  }
+
+  .template-options--poster .template-card--poster {
+    flex: 0 0 172px;
+    scroll-snap-align: start;
+  }
+
+  .poster-settings.poster-settings {
+    overflow-x: hidden;
+  }
+
+  .poster-preview-panel .export-actions {
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+}
+
+@font-face {
+  font-family: 'Goods Island Sans';
+  src: url('/fonts/NunitoSans-Variable.ttf') format('truetype');
+  font-weight: 200 1000;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Goods Island Serif';
+  src: url('/fonts/PlayfairDisplay-Variable.ttf') format('truetype');
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Goods Island Hand';
+  src: url('/fonts/Caveat-Variable.ttf') format('truetype');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+.poster-preview__svg {
+  width: 100%;
+  max-height: 680px;
+  overflow: hidden;
+  line-height: 0;
+  filter: drop-shadow(0 9px 20px rgb(64 66 50 / 9%));
+}
+
+.poster-preview__svg svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 680px;
+}
+
+@keyframes poster-skeleton-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+
+.poster-item__art i {
+  animation-name: poster-skeleton-shimmer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poster-item__art i {
+    animation: none;
+  }
+}

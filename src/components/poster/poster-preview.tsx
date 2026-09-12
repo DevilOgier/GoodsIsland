@@ -26,9 +26,11 @@ export function PosterPreview({
       </div>
       <div className="poster-preview">
         {svg ? (
-          <img
-            src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`}
-            alt="海报实时预览"
+          <div
+            className="poster-preview__svg"
+            role="img"
+            aria-label="海报实时预览"
+            dangerouslySetInnerHTML={{ __html: svg }}
           />
         ) : (
           <div className="empty">

@@ -1,24 +1,33 @@
 'use client';
+
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Palette, Save, Plus } from 'lucide-react';
+import { Download, Palette, Plus, Save } from 'lucide-react';
 import type { Snapshot } from './types';
 import { renderPoster, templates } from '@/poster/renderer';
 import type { PosterItemData } from '@/poster/renderer';
+import { assetData, embedPosterFonts, mapWithConcurrency, posterFontCss } from '@/poster/assets';
+import { posterTemplateRegistry, posterTemplates } from '@/poster/registry';
+import type { PosterRenderOptions } from '@/poster/types';
+import { resolveOptions } from '@/poster/utils';
 import { posterPrefill } from '@/domain/poster-prefill';
 import ProductPicker from './product-picker';
 import { TemplateSelector } from './poster/template-selector';
 import { PosterPreview } from './poster/poster-preview';
 import { PosterItemList } from './poster/poster-item-list';
-async function assetData(id: string) {
-  const r = await fetch('/api/images/' + id);
-  if (!r.ok) throw Error('商品图片加载失败');
-  const blob = await r.blob();
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+
+function exportAssetId(product: Snapshot['products'][number]) {
+  return product.selectedSource === 'ENHANCED' && product.enhancedId
+    ? product.enhancedId
+    : product.originalId || undefined;
+}
+
+async function loadPreview(item: PosterItemData) {
+  if (!item.previewAssetId) return item;
+  try {
+    return { ...item, image: await assetData(item.previewAssetId) };
+  } catch {
+    return item;
+  }
 }
 
 export default function PosterEditor({
@@ -34,118 +43,207 @@ export default function PosterEditor({
 }) {
   const [initial] = useState(() => posterPrefill(data, source, sourceId));
   const [type, setType] = useState<'SALE' | 'WANTED'>(initial.type);
-  const [version, setVersion] = useState(2);
+  const [version, setVersion] = useState(3);
   const [picking, setPicking] = useState(false);
-  const [imageLoading, setImageLoading] = useState(!!Object.keys(initial.assets).length);
+  const [previewLoading, setPreviewLoading] = useState(
+    initial.items.some((item) => Boolean(item.previewAssetId)),
+  );
   const [title, setTitle] = useState(initial.title);
   const [ratio, setRatio] = useState('1:1');
-  const [template, setTemplate] = useState('cute');
+  const [template, setTemplate] = useState('polaroid');
+  const [config, setConfig] = useState<PosterRenderOptions>({
+    ...posterTemplates[0].defaultOptions,
+  });
   const [items, setItems] = useState<PosterItemData[]>(initial.items);
-  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const productMap = useMemo(
+    () => new Map(data.products.map((product) => [product.id, product])),
+    [data.products],
+  );
+  const availableInventoryIds = useMemo(
+    () =>
+      new Set(
+        data.inventory
+          .filter((inventory) => inventory.currentQuantity > 0)
+          .map((inventory) => inventory.productId),
+      ),
+    [data.inventory],
+  );
+  const products = useMemo(
+    () =>
+      data.products.filter((product) => type === 'WANTED' || availableInventoryIds.has(product.id)),
+    [availableInventoryIds, data.products, type],
+  );
+  const allowedIds = useMemo(() => {
+    const selected = new Set(items.map((item) => item.productId));
+    return products.filter((product) => !selected.has(product.id)).map((product) => product.id);
+  }, [items, products]);
+
   const rendered = useMemo(() => {
     try {
-      return { svg: renderPoster({ title, type, ratio, template, items, version }), error: '' };
-    } catch (e) {
-      return { svg: '', error: (e as Error).message };
+      return {
+        svg: renderPoster({ title, type, ratio, template, items, version, config }),
+        error: '',
+      };
+    } catch (error) {
+      return { svg: '', error: (error as Error).message };
     }
-  }, [title, type, ratio, template, items, version]);
+  }, [config, items, ratio, template, title, type, version]);
+
   useEffect(() => {
     let cancelled = false;
-    Promise.all(
-      Object.entries(initial.assets).map(
-        async ([id, asset]) => [id, await assetData(asset)] as const,
-      ),
-    )
-      .then((images) => {
-        if (cancelled) return;
-        setItems((current) =>
-          current.map((item) => ({
-            ...item,
-            image: images.find(([id]) => id === item.productId)?.[1] ?? item.image,
-          })),
-        );
-      })
-      .catch((e) => {
-        if (!cancelled) setError((e as Error).message);
+    if (!initial.items.some((item) => item.previewAssetId)) return;
+    Promise.all(initial.items.map(loadPreview))
+      .then((loaded) => {
+        if (!cancelled) setItems(loaded);
       })
       .finally(() => {
-        if (!cancelled) setImageLoading(false);
+        if (!cancelled) setPreviewLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [initial]);
-  async function add(productId: string) {
-    if (!productId || items.some((i) => i.productId === productId)) return;
-    const p = data.products.find((p) => p.id === productId)!;
-    setError('');
-    try {
-      const asset = p.selectedSource === 'ENHANCED' && p.enhancedId ? p.enhancedId : p.originalId;
-      const image = asset ? await assetData(asset) : undefined;
-      setItems((old) =>
-        old.some((i) => i.productId === productId)
-          ? old
-          : [...old, { productId, name: p.name, quantity: 1, price: '', note: '', image }],
-      );
-    } catch (e) {
-      setError((e as Error).message);
+
+  function add(productId: string) {
+    if (!productId || items.some((item) => item.productId === productId)) return;
+    const product = productMap.get(productId);
+    if (!product) return;
+
+    setStatus('');
+    const item: PosterItemData = {
+      productId,
+      name: product.name,
+      quantity: 1,
+      price: '',
+      note: '',
+      previewAssetId: product.thumbnailId || product.originalId || undefined,
+      exportAssetId: exportAssetId(product),
+    };
+    setItems((current) =>
+      current.some((value) => value.productId === productId) ? current : [...current, item],
+    );
+
+    if (item.previewAssetId) {
+      void loadPreview(item).then((loaded) => {
+        setItems((current) =>
+          current.map((value) =>
+            value.productId === productId ? { ...value, image: loaded.image } : value,
+          ),
+        );
+      });
     }
   }
+
   async function exportImage(format: 'png' | 'jpeg') {
     setBusy(true);
-    setError('');
+    setStatus('正在准备高清图片...');
     try {
-      if (imageLoading) throw Error('图片还在加载，请稍候');
-      if (!rendered.svg) throw Error(rendered.error);
-      await document.fonts.ready;
-      const url = URL.createObjectURL(
-        new Blob([rendered.svg], { type: 'image/svg+xml;charset=utf-8' }),
+      const [exportItems, embeddedFontCss] = await Promise.all([
+        mapWithConcurrency(items, 4, async (item) => {
+          if (!item.exportAssetId) return { ...item, image: undefined };
+          try {
+            return { ...item, image: await assetData(item.exportAssetId) };
+          } catch {
+            throw new Error(`“${item.name}”高清图加载失败，请稍后重试`);
+          }
+        }),
+        posterFontCss(),
+      ]);
+      setStatus('正在生成海报...');
+      const svg = embedPosterFonts(
+        renderPoster({
+          title,
+          type,
+          ratio,
+          template,
+          items: exportItems,
+          version,
+          config,
+        }),
+        embeddedFontCss,
       );
+      await Promise.race([
+        document.fonts.ready,
+        new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+      ]);
+      const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
       try {
         const image = new Image();
         await new Promise<void>((resolve, reject) => {
           image.onload = () => resolve();
-          image.onerror = () => reject(Error('海报渲染失败'));
+          image.onerror = () => reject(new Error('海报渲染失败'));
           image.src = url;
         });
         const canvas = document.createElement('canvas');
         canvas.width = image.width;
         canvas.height = image.height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(image, 0, 0);
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('浏览器无法创建海报画布');
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0);
         const blob = await new Promise<Blob>((resolve, reject) =>
           canvas.toBlob(
-            (b) => (b ? resolve(b) : reject(Error('图片导出失败'))),
-            'image/' + format,
+            (value) => (value ? resolve(value) : reject(new Error('图片导出失败'))),
+            `image/${format}`,
             0.95,
           ),
         );
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download =
-          '谷屿-' +
-          (type === 'SALE' ? '出物' : '收物') +
-          '.' +
-          (format === 'jpeg' ? 'jpg' : format);
+        link.download = `谷屿-${type === 'SALE' ? '出物' : '收物'}.${format === 'jpeg' ? 'jpg' : format}`;
         link.click();
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        setStatus('海报已导出');
       } finally {
         URL.revokeObjectURL(url);
       }
-    } catch (e) {
-      setError((e as Error).message);
+    } catch (error) {
+      setStatus((error as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  const products = data.products.filter(
-    (p) =>
-      type === 'WANTED' ||
-      data.inventory.some((i) => i.productId === p.id && i.currentQuantity > 0),
-  );
+
+  async function loadSavedPoster(poster: Snapshot['posters'][number]) {
+    setType(poster.type as 'SALE' | 'WANTED');
+    setTitle(poster.title);
+    setRatio(poster.ratio);
+    setTemplate(poster.template.key);
+    setVersion(poster.template.version);
+    const nextTemplate = posterTemplateRegistry.get(poster.template.key);
+    if (nextTemplate) {
+      setConfig(
+        resolveOptions(
+          nextTemplate.defaultOptions,
+          poster.templateConfig as Partial<PosterRenderOptions>,
+        ),
+      );
+    }
+    setStatus('');
+
+    const baseItems: PosterItemData[] = poster.items.map((item) => {
+      const product = productMap.get(item.productId);
+      return {
+        productId: item.productId,
+        name: (item.productSnapshot as { name: string }).name,
+        quantity: item.quantity,
+        price: item.price ?? '',
+        note: item.note,
+        previewAssetId: product?.thumbnailId || product?.originalId || undefined,
+        exportAssetId: item.imageAssetId || (product ? exportAssetId(product) : undefined),
+      };
+    });
+    setItems(baseItems);
+    setPreviewLoading(baseItems.some((item) => Boolean(item.previewAssetId)));
+    const loaded = await Promise.all(baseItems.map(loadPreview));
+    setItems(loaded);
+    setPreviewLoading(false);
+  }
+
   return (
     <>
       <div className="page-intro">
@@ -182,7 +280,11 @@ export default function PosterEditor({
           </div>
           <label>
             海报标题
-            <input maxLength={24} value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input
+              maxLength={24}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
           </label>
           <h3>02 / 放进你的喜欢</h3>
           <button className="poster-picker-button" onClick={() => setPicking(true)}>
@@ -194,25 +296,30 @@ export default function PosterEditor({
               的商品、数量、价格和备注，可以继续编辑。
             </p>
           )}
-          {imageLoading && <p className="muted">正在加载商品图片…</p>}
+          {previewLoading && <p className="muted">正在准备预览缩略图，不影响继续编辑。</p>}
           <PosterItemList items={items} onChange={setItems} />
           <TemplateSelector
             ratio={ratio}
             template={template}
+            config={config}
             onRatioChange={setRatio}
             onTemplateChange={(key) => {
+              const nextTemplate = posterTemplateRegistry.get(key);
+              if (!nextTemplate) return;
               setTemplate(key);
-              setVersion(2);
+              setConfig({ ...nextTemplate.defaultOptions });
+              setVersion(3);
             }}
+            onConfigChange={setConfig}
           />
           <p className="muted">导出海报不会挂出或扣库存。挂出请在“正在出物”中操作。</p>
           <button
-            disabled={busy || imageLoading || !rendered.svg}
+            disabled={busy || !rendered.svg}
             onClick={async () => {
               setBusy(true);
-              setError('');
+              setStatus('');
               try {
-                const r = await fetch('/api/posters', {
+                const response = await fetch('/api/posters', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -221,6 +328,7 @@ export default function PosterEditor({
                     ratio,
                     template,
                     templateVersion: version,
+                    templateConfig: config,
                     items: items.map(({ productId, quantity, price, note }) => ({
                       productId,
                       quantity,
@@ -229,12 +337,12 @@ export default function PosterEditor({
                     })),
                   }),
                 });
-                const j = await r.json();
-                if (!r.ok) throw Error(j.error);
+                const body = await response.json();
+                if (!response.ok) throw new Error(body.error);
                 await onSaved();
-                setError('海报已保存到作品集');
-              } catch (e) {
-                setError((e as Error).message);
+                setStatus('海报已保存到作品集');
+              } catch (error) {
+                setStatus((error as Error).message);
               } finally {
                 setBusy(false);
               }
@@ -247,20 +355,17 @@ export default function PosterEditor({
           svg={rendered.svg}
           error={rendered.error}
           ratio={ratio}
-          templateLabel={templates[template].label}
-          status={error}
+          templateLabel={templates[template]?.label ?? '历史模板'}
+          status={status}
         >
           <button
             className="primary"
-            disabled={busy || imageLoading || !rendered.svg}
+            disabled={busy || !rendered.svg}
             onClick={() => exportImage('png')}
           >
-            <Download size={16} /> 导出 PNG
+            <Download size={16} /> {busy ? '正在生成…' : '导出 PNG'}
           </button>
-          <button
-            disabled={busy || imageLoading || !rendered.svg}
-            onClick={() => exportImage('jpeg')}
-          >
+          <button disabled={busy || !rendered.svg} onClick={() => exportImage('jpeg')}>
             导出 JPG
           </button>
         </PosterPreview>
@@ -268,12 +373,10 @@ export default function PosterEditor({
       {picking && (
         <ProductPicker
           data={data}
-          allowedIds={products
-            .filter((p) => !items.some((i) => i.productId === p.id))
-            .map((p) => p.id)}
+          allowedIds={allowedIds}
           onClose={() => setPicking(false)}
-          onSelect={(p) => {
-            void add(p.id);
+          onSelect={(product) => {
+            add(product.id);
             setPicking(false);
           }}
         />
@@ -283,36 +386,12 @@ export default function PosterEditor({
         <span>{data.posters.length} 张</span>
       </section>
       <div className="saved-posters">
-        {data.posters.map((p) => (
-          <button
-            key={p.id}
-            onClick={async () => {
-              setType(p.type as 'SALE' | 'WANTED');
-              setTitle(p.title);
-              setRatio(p.ratio);
-              setTemplate(p.template.key);
-              setVersion(p.template.version);
-              try {
-                const loaded = await Promise.all(
-                  p.items.map(async (i) => ({
-                    productId: i.productId,
-                    name: (i.productSnapshot as { name: string }).name,
-                    quantity: i.quantity,
-                    price: i.price ?? '',
-                    note: i.note,
-                    image: i.imageAssetId ? await assetData(i.imageAssetId) : undefined,
-                  })),
-                );
-                setItems(loaded);
-              } catch (e) {
-                setError((e as Error).message);
-              }
-            }}
-          >
+        {data.posters.map((poster) => (
+          <button key={poster.id} onClick={() => void loadSavedPoster(poster)}>
             <Palette size={20} />
-            <strong>{p.title}</strong>
+            <strong>{poster.title}</strong>
             <small>
-              {p.ratio} · {p.items.length} 件
+              {poster.ratio} · {poster.items.length} 件
             </small>
           </button>
         ))}

@@ -12,9 +12,13 @@ export function PosterItemList({
 }) {
   return items.map((item, index) => (
     <div className="poster-item" key={item.productId}>
-      <div>
+      <div className="poster-item__heading">
+        <span className={`poster-item__art ${item.image ? 'is-loaded' : ''}`}>
+          {item.image ? <img src={item.image} alt="" /> : <i aria-hidden="true" />}
+        </span>
         <strong>{item.name}</strong>
         <button
+          type="button"
           className="icon-btn"
           aria-label={`移除${item.name}`}
           onClick={() => onChange(items.filter((_, position) => position !== index))}
@@ -42,6 +46,7 @@ export function PosterItemList({
         <label>
           单价
           <input
+            inputMode="decimal"
             placeholder="可议"
             value={item.price}
             onChange={(event) =>

@@ -1,39 +1,56 @@
 import type { Snapshot } from '@/components/types';
 import type { PosterItemData } from '@/poster/renderer';
+
 export function posterPrefill(data: Snapshot, source?: string, id?: string) {
   const type = source === 'wanted' ? ('WANTED' as const) : ('SALE' as const);
   const records =
     source === 'wanted'
       ? data.wanted
-          .filter((w) => ['WANTED', 'PARTIAL'].includes(w.status) && (!id || w.id === id))
-          .map((w) => ({
-            productId: w.productId,
-            quantity: w.wantedQuantity - w.fulfilledQuantity,
-            price: w.targetPrice ?? '',
-            note: w.notes,
+          .filter(
+            (wanted) => ['WANTED', 'PARTIAL'].includes(wanted.status) && (!id || wanted.id === id),
+          )
+          .map((wanted) => ({
+            productId: wanted.productId,
+            quantity: wanted.wantedQuantity - wanted.fulfilledQuantity,
+            price: wanted.targetPrice ?? '',
+            note: wanted.notes,
           }))
       : source === 'listings'
         ? data.listings
-            .filter((l) => l.status === 'ACTIVE' && (!id || l.id === id))
-            .map((l) => ({
-              productId: l.inventory.productId,
-              quantity: l.remainingQuantity,
-              price: l.unitPrice,
-              note: l.notes,
+            .filter((listing) => listing.status === 'ACTIVE' && (!id || listing.id === id))
+            .map((listing) => ({
+              productId: listing.inventory.productId,
+              quantity: listing.remainingQuantity,
+              price: listing.unitPrice,
+              note: listing.notes,
             }))
         : [];
+
+  const productMap = new Map(data.products.map((product) => [product.id, product]));
   const items: PosterItemData[] = [];
   const assets: Record<string, string> = {};
+
   for (const record of records) {
     if (record.quantity <= 0) continue;
-    const product = data.products.find((p) => p.id === record.productId);
+    const product = productMap.get(record.productId);
     if (!product) continue;
-    items.push({ ...record, name: product.name });
-    const asset =
+    const exportAssetId =
       product.selectedSource === 'ENHANCED' && product.enhancedId
         ? product.enhancedId
         : product.originalId;
-    if (asset) assets[product.id] = asset;
+    items.push({
+      ...record,
+      name: product.name,
+      previewAssetId: product.thumbnailId || product.originalId || undefined,
+      exportAssetId: exportAssetId || undefined,
+    });
+    if (exportAssetId) assets[product.id] = exportAssetId;
   }
-  return { type, items, assets, title: type === 'WANTED' ? '收一些心动收藏' : '出一些心动收藏' };
+
+  return {
+    type,
+    items,
+    assets,
+    title: type === 'WANTED' ? '收一些心动收藏' : '出一些心动收藏',
+  };
 }

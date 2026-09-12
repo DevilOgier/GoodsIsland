@@ -34,14 +34,18 @@ function ProductImage({ id, name, large }: { id: string; name: string; large: bo
 export default function ProductArt({
   product,
   large = false,
+  purpose = large ? 'detail' : 'card',
 }: {
   product: Product;
   large?: boolean;
+  purpose?: 'thumbnail' | 'card' | 'detail';
 }) {
   const id =
-    product.selectedSource === 'ENHANCED' && product.enhancedId
-      ? product.enhancedId
-      : (!large && product.thumbnailId) || product.originalId;
+    purpose === 'thumbnail'
+      ? product.thumbnailId || product.originalId
+      : product.selectedSource === 'ENHANCED' && product.enhancedId
+        ? product.enhancedId
+        : (purpose !== 'detail' && product.thumbnailId) || product.originalId;
   const image = id ? <ProductImage key={id} id={id} name={product.name} large={large} /> : null;
   if (image) return image;
   const palettes = [

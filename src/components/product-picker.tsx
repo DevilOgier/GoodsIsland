@@ -1,24 +1,36 @@
 'use client';
-import { useState } from 'react';
-import { ArrowLeft, Search, X, Check } from 'lucide-react';
-import type { Snapshot, Product } from './types';
+
+import { useMemo, useState } from 'react';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
+import type { Product, Snapshot } from './types';
 import ProductArt from './product-art';
+
+const PAGE_SIZE = 32;
+
+export function selectSeriesPreviewProducts(products: Product[]) {
+  if (products.length <= 4) return products;
+  const last = products.length - 1;
+  return [0, Math.floor(last / 3), Math.floor((last * 2) / 3), last].map(
+    (index) => products[index],
+  );
+}
+
 export function SeriesCollage({ products }: { products: Product[] }) {
+  const previewProducts = selectSeriesPreviewProducts(products);
   return (
     <div
       className="series-collage"
-      style={{
-        gridTemplateColumns: 'repeat(' + Math.ceil(Math.sqrt(products.length || 1)) + ',1fr)',
-      }}
+      style={{ gridTemplateColumns: `repeat(${previewProducts.length === 1 ? 1 : 2}, 1fr)` }}
     >
-      {products.map((p) => (
-        <div key={p.id}>
-          <ProductArt product={p} />
+      {previewProducts.map((product) => (
+        <div key={product.id}>
+          <ProductArt product={product} purpose="thumbnail" />
         </div>
       ))}
     </div>
   );
 }
+
 export default function ProductPicker({
   data,
   onSelect,
@@ -27,28 +39,51 @@ export default function ProductPicker({
   selectedId,
 }: {
   data: Snapshot;
-  onSelect: (p: Product) => void;
+  onSelect: (product: Product) => void;
   onClose: () => void;
   allowedIds?: string[];
   selectedId?: string;
 }) {
   const [ip, setIp] = useState('');
   const [character, setCharacter] = useState('');
-  const [q, setQ] = useState('');
+  const [query, setQuery] = useState('');
   const [seriesId, setSeries] = useState('');
-  const available = data.products.filter(
-    (p) => p.status === 'ACTIVE' && (!allowedIds || allowedIds.includes(p.id)),
-  );
-  const filtered = available.filter(
-    (p) =>
-      (!ip || p.series.character.ipId === ip) &&
-      (!character || p.series.characterId === character) &&
-      (!q || (p.name + p.series.name + p.series.character.name).includes(q)),
-  );
-  const groups = data.series
-    .map((series) => ({ series, products: filtered.filter((p) => p.seriesId === series.id) }))
-    .filter((g) => g.products.length);
-  const current = groups.find((g) => g.series.id === seriesId);
+  const [page, setPage] = useState(1);
+
+  const groups = useMemo(() => {
+    const allowed = allowedIds ? new Set(allowedIds) : null;
+    const bySeries = new Map<string, Product[]>();
+    const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN');
+
+    for (const product of data.products) {
+      if (product.status !== 'ACTIVE' || (allowed && !allowed.has(product.id))) continue;
+      if (ip && product.series.character.ipId !== ip) continue;
+      if (character && product.series.characterId !== character) continue;
+      const searchable = `${product.name}${product.series.name}${product.series.character.name}`;
+      if (normalizedQuery && !searchable.toLocaleLowerCase('zh-CN').includes(normalizedQuery))
+        continue;
+      const products = bySeries.get(product.seriesId);
+      if (products) products.push(product);
+      else bySeries.set(product.seriesId, [product]);
+    }
+
+    return data.series.flatMap((series) => {
+      const products = bySeries.get(series.id);
+      return products?.length ? [{ series, products }] : [];
+    });
+  }, [allowedIds, character, data.products, data.series, ip, query]);
+
+  const current = groups.find((group) => group.series.id === seriesId);
+  const pageCount = current ? Math.max(1, Math.ceil(current.products.length / PAGE_SIZE)) : 1;
+  const visibleProducts = current
+    ? current.products.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+    : [];
+
+  function resetSeries() {
+    setSeries('');
+    setPage(1);
+  }
+
   return (
     <div className="modal-backdrop picker-backdrop">
       <section
@@ -73,16 +108,16 @@ export default function ProductPicker({
             <select
               aria-label="筛选 IP"
               value={ip}
-              onChange={(e) => {
-                setIp(e.target.value);
+              onChange={(event) => {
+                setIp(event.target.value);
                 setCharacter('');
-                setSeries('');
+                resetSeries();
               }}
             >
               <option value="">全部 IP</option>
-              {data.ips.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
+              {data.ips.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
                 </option>
               ))}
             </select>
@@ -92,17 +127,17 @@ export default function ProductPicker({
             <select
               aria-label="筛选角色"
               value={character}
-              onChange={(e) => {
-                setCharacter(e.target.value);
-                setSeries('');
+              onChange={(event) => {
+                setCharacter(event.target.value);
+                resetSeries();
               }}
             >
               <option value="">全部角色</option>
               {data.characters
-                .filter((c) => !ip || c.ipId === ip)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
+                .filter((item) => !ip || item.ipId === ip)
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
                   </option>
                 ))}
             </select>
@@ -113,10 +148,10 @@ export default function ProductPicker({
               <Search size={16} />
               <input
                 aria-label="搜索系列或商品"
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setSeries('');
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  resetSeries();
                 }}
                 placeholder="系列、角色、商品名称"
               />
@@ -125,21 +160,21 @@ export default function ProductPicker({
         </div>
         {current ? (
           <>
-            <button type="button" className="back-link" onClick={() => setSeries('')}>
+            <button type="button" className="back-link" onClick={resetSeries}>
               <ArrowLeft size={16} /> 返回所有系列
             </button>
             <div className="picker-product-grid">
-              {current.products.map((p) => (
+              {visibleProducts.map((product) => (
                 <button
                   type="button"
-                  className={'picker-product ' + (selectedId === p.id ? 'selected' : '')}
-                  key={p.id}
-                  onClick={() => onSelect(p)}
+                  className={`picker-product ${selectedId === product.id ? 'selected' : ''}`}
+                  key={product.id}
+                  onClick={() => onSelect(product)}
                 >
-                  <ProductArt product={p} />
+                  <ProductArt product={product} purpose="thumbnail" />
                   <div>
-                    <strong>{p.typeDefinition.name}</strong>
-                    <small>{p.name}</small>
+                    <strong>{product.typeDefinition.name}</strong>
+                    <small>{product.name}</small>
                     <span>
                       选择这一款 <Check size={15} />
                     </span>
@@ -147,23 +182,49 @@ export default function ProductPicker({
                 </button>
               ))}
             </div>
+            {pageCount > 1 && (
+              <nav className="picker-pagination" aria-label="商品分页">
+                <button
+                  type="button"
+                  disabled={page === 1}
+                  onClick={() => setPage((value) => value - 1)}
+                >
+                  <ChevronLeft size={16} /> 上一页
+                </button>
+                <span>
+                  {page} / {pageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={page === pageCount}
+                  onClick={() => setPage((value) => value + 1)}
+                >
+                  下一页 <ChevronRight size={16} />
+                </button>
+              </nav>
+            )}
           </>
         ) : (
           <div className="series-grid">
-            {groups.map((g) => (
+            {groups.map((group) => (
               <button
                 type="button"
                 className="series-tile"
-                key={g.series.id}
-                onClick={() => setSeries(g.series.id)}
+                key={group.series.id}
+                onClick={() => {
+                  setSeries(group.series.id);
+                  setPage(1);
+                }}
               >
-                <SeriesCollage products={g.products} />
+                <SeriesCollage products={group.products} />
                 <div>
-                  <small>{g.products[0].series.character.name}</small>
-                  <strong>{g.series.name}</strong>
+                  <small>{group.products[0].series.character.name}</small>
+                  <strong>{group.series.name}</strong>
                   <span>
-                    {g.products.length} 款谷子 ·{' '}
-                    {g.products.map((p) => p.typeDefinition.name).join(' / ')}
+                    {group.products.length} 款谷子 ·{' '}
+                    {Array.from(
+                      new Set(group.products.map((product) => product.typeDefinition.name)),
+                    ).join(' / ')}
                   </span>
                 </div>
               </button>
