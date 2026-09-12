@@ -4,10 +4,19 @@ import { X, Images } from 'lucide-react';
 import ProductPicker from './product-picker';
 import ProductArt from './product-art';
 import ProductEditor from './product-editor';
-import { PurchaseChannelPicker } from './purchase/purchase-channel-picker';
+import PurchaseForm from './purchase/purchase-form';
+import SaleForm from './sale/sale-form';
+import WantedForm from './wanted/wanted-form';
 import type { Snapshot } from './types';
 import { typeNames } from './types';
 export type Dialog = { type: string; id?: string; productId?: string; wantedId?: string };
+type ActionFormProps = {
+  dialog: Dialog;
+  data: Snapshot;
+  onClose: () => void;
+  onSave: (op: string, payload: Record<string, unknown>) => Promise<unknown>;
+  onRefresh: () => Promise<void>;
+};
 type Field = {
   name: string;
   label: string;
@@ -17,44 +26,49 @@ type Field = {
   required?: boolean;
   min?: string;
 };
-export default function ActionForm({
-  dialog,
-  data,
-  onClose,
-  onSave,
-  onRefresh,
-}: {
-  dialog: Dialog;
-  data: Snapshot;
-  onClose: () => void;
-  onSave: (op: string, payload: Record<string, unknown>) => Promise<unknown>;
-  onRefresh: () => Promise<void>;
-}) {
+export default function ActionForm(props: ActionFormProps) {
+  const { dialog, data, onClose, onSave } = props;
+  if (['purchase', 'purchaseEdit'].includes(dialog.type))
+    return (
+      <PurchaseForm
+        data={data}
+        mode={dialog.type === 'purchaseEdit' ? 'edit' : 'create'}
+        id={dialog.id}
+        productId={dialog.productId}
+        wantedId={dialog.wantedId}
+        onClose={onClose}
+        onSave={onSave}
+      />
+    );
+  if (dialog.type === 'sale')
+    return (
+      <SaleForm
+        data={data}
+        productId={dialog.productId}
+        listingId={dialog.id}
+        onClose={onClose}
+        onSave={onSave}
+      />
+    );
+  if (['wanted', 'wantedEdit'].includes(dialog.type))
+    return (
+      <WantedForm
+        data={data}
+        id={dialog.type === 'wantedEdit' ? dialog.id : undefined}
+        productId={dialog.productId}
+        onClose={onClose}
+        onSave={onSave}
+      />
+    );
+  return <LegacyActionForm {...props} />;
+}
+
+function LegacyActionForm({ dialog, data, onClose, onSave, onRefresh }: ActionFormProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const purchase = data.purchases.find((p) => p.id === dialog.id);
-  const wanted = data.wanted.find((w) => w.id === dialog.id);
-  const [pickedId, setPickedId] = useState(
-    dialog.productId ?? purchase?.productId ?? wanted?.productId ?? '',
-  );
+  const [pickedId, setPickedId] = useState(dialog.productId ?? purchase?.productId ?? '');
   const [picking, setPicking] = useState(false);
-  const linkedGroup =
-    dialog.type === 'purchase' && dialog.id
-      ? data.groups.find((g) => g.items.some((i) => i.id === dialog.id))
-      : purchase
-        ? data.groups.find((g) => g.items.some((i) => i.purchase?.id === purchase.id))
-        : undefined;
-  const linkedItem = linkedGroup?.items.find(
-    (i) => i.id === dialog.id || i.purchase?.id === purchase?.id,
-  );
-  const [channel, setChannel] = useState(
-    purchase?.purchaseChannel ?? (linkedGroup ? '拼团' : '闲鱼'),
-  );
-  const [groupChoice, setGroupChoice] = useState(linkedGroup?.id ?? '');
-  const [itemChoice, setItemChoice] = useState('');
-  const chosenGroup = data.groups.find((g) => g.id === groupChoice);
-  const availableItems =
-    chosenGroup?.items.filter((i) => i.productId === pickedId && !i.purchase) ?? [];
   const picked = data.products.find((p) => p.id === pickedId);
   if (['product', 'productEdit'].includes(dialog.type))
     return (
@@ -85,87 +99,10 @@ export default function ActionForm({
     min: '0',
   };
   const notes: Field = { name: 'notes', label: '备注', required: false };
-  const date = new Date().toLocaleDateString('sv-SE');
   let title = '',
     op = '',
     fields: Field[] = [];
   switch (dialog.type) {
-    case 'purchase':
-      title = '记录一份新喜欢';
-      op = 'purchase.create';
-      fields = [
-        product,
-        { ...qty, value: linkedItem ? String(linkedItem.quantity) : '1' },
-        { ...unit, value: linkedItem ? String(linkedItem.unitPrice) : '0' },
-        {
-          name: 'purchaseChannel',
-          label: '购买渠道',
-          options: ['闲鱼', '拼团', '煤炉', '直播间', '淘宝', '线下', '其他'].map((v) => [v, v]),
-        },
-        { name: 'purchaseDate', label: '购买日期', kind: 'date', value: date },
-        {
-          name: 'arrivalStatus',
-          label: '到货状态',
-          options: [
-            ['PENDING', '待到货（暂不入库）'],
-            ['SHIPPED', '运输中'],
-            ['ARRIVED', '已经到货（立即入库）'],
-          ],
-        },
-        ...['domesticShipping', 'internationalShipping', 'otherFee'].map((name, i) => ({
-          name,
-          label: ['国内运费', '国际运费', '其他费用'][i] + '（元）',
-          kind: 'number',
-          value: '0',
-          min: '0',
-        })),
-        notes,
-      ];
-      break;
-    case 'purchaseEdit':
-      if (!purchase) break;
-      title = '修正买入记录';
-      op = 'purchase.update';
-      fields = [
-        { ...product, value: purchase.productId },
-        { ...qty, value: String(purchase.quantity) },
-        { ...unit, value: String(purchase.unitPrice) },
-        {
-          name: 'purchaseChannel',
-          label: '购买渠道',
-          value: purchase.purchaseChannel,
-          options: ['闲鱼', '拼团', '煤炉', '直播间', '淘宝', '线下', '其他'].map((v) => [v, v]),
-        },
-        {
-          name: 'purchaseDate',
-          label: '购买日期',
-          kind: 'date',
-          value: purchase.purchaseDate.slice(0, 10),
-        },
-        {
-          name: 'arrivalStatus',
-          label: '到货状态',
-          value: purchase.arrivalStatus,
-          options: [
-            ['PENDING', '待到货（暂不入库）'],
-            ['SHIPPED', '运输中'],
-            ['ARRIVED', '已经到货（计入库存）'],
-          ],
-        },
-        ...[
-          ['domesticShipping', '国内运费', purchase.domesticShipping],
-          ['internationalShipping', '国际运费', purchase.internationalShipping],
-          ['otherFee', '其他费用', purchase.otherFee],
-        ].map(([name, label, value]) => ({
-          name,
-          label: label + '（元）',
-          kind: 'number',
-          value: String(value),
-          min: '0',
-        })),
-        { ...notes, value: purchase.notes },
-      ];
-      break;
     case 'productType':
       title = '新增谷子类型';
       op = 'catalog.type';
@@ -185,76 +122,10 @@ export default function ActionForm({
         { name: 'reason', label: '补费原因', required: true },
       ];
       break;
-    case 'sale':
-      title = '确认真正卖出';
-      op = 'sale.create';
-      fields = [
-        product,
-        qty,
-        unit,
-        {
-          name: 'saleChannel',
-          label: '出物渠道',
-          options: ['闲鱼', '面交', '群内', '朋友', '其他'].map((v) => [v, v]),
-        },
-        { name: 'saleDate', label: '成交日期', kind: 'date', value: date },
-        notes,
-      ];
-      break;
     case 'listing':
       title = '把喜欢传递出去';
       op = 'listing.create';
       fields = [product, qty, unit, notes];
-      break;
-    case 'wanted':
-      title = '添一份收物心愿';
-      op = 'wanted.create';
-      fields = [
-        product,
-        { ...qty, name: 'wantedQuantity', label: '想收数量' },
-        { ...unit, name: 'targetPrice', label: '心理单价（元）' },
-        {
-          name: 'priority',
-          label: '优先级',
-          options: [
-            ['NORMAL', '慢慢收'],
-            ['HIGH', '很想拥有'],
-            ['LOW', '随缘收'],
-          ],
-        },
-        notes,
-      ];
-      break;
-    case 'wantedEdit':
-      if (!wanted) break;
-      title = '修改收物心愿';
-      op = 'wanted.update';
-      fields = [
-        { ...product, value: wanted.productId },
-        {
-          ...qty,
-          name: 'wantedQuantity',
-          label: '想收数量',
-          value: String(wanted.wantedQuantity),
-        },
-        {
-          ...unit,
-          name: 'targetPrice',
-          label: '心理单价（元）',
-          value: String(wanted.targetPrice ?? 0),
-        },
-        {
-          name: 'priority',
-          label: '优先级',
-          value: wanted.priority,
-          options: [
-            ['NORMAL', '慢慢收'],
-            ['HIGH', '很想拥有'],
-            ['LOW', '随缘收'],
-          ],
-        },
-        { ...notes, value: wanted.notes },
-      ];
       break;
     case 'group':
       title = '记录一个新拼团';
@@ -363,9 +234,6 @@ export default function ActionForm({
             元。补费会同步调整剩余库存成本与已售利润，历史记录保留。
           </p>
         )}
-        {dialog.type === 'purchaseEdit' && purchase?.adjustments.length ? (
-          <p className="notice">后续补录的费用会保留，并在修正后重新计算库存成本。</p>
-        ) : null}
         {dialog.type === 'listing' && (
           <p className="notice">挂出不会减少库存，只有确认成交才会扣减。</p>
         )}
@@ -383,37 +251,12 @@ export default function ActionForm({
               if (payload[k]) payload[k] = Number(payload[k]);
             if (!payload.parentId) delete payload.parentId;
             if (dialog.type === 'productEdit') payload.id = dialog.id;
-            if (dialog.type === 'purchaseEdit') payload.id = dialog.id;
-            if (dialog.type === 'wantedEdit') payload.id = dialog.id;
-            if (dialog.wantedId) {
-              payload.wantedId = dialog.wantedId;
-              payload.updateWanted = payload.updateWanted === 'on';
-            }
             if (dialog.type === 'fees') payload.purchaseId = dialog.id;
-            if (dialog.type === 'sale' && dialog.id) payload.listingId = dialog.id;
             if (dialog.type === 'groupItem') payload.groupId = dialog.id;
             if (dialog.type === 'groupDispatch') payload.id = dialog.id;
-            if (dialog.type === 'purchase' && dialog.id) {
-              const item = data.groups.flatMap((g) => g.items).find((i) => i.id === dialog.id);
-              if (item) payload.groupBuyItemId = item.id;
-            }
             try {
               if (fields.some((f) => f.name === 'productId') && !pickedId)
                 throw Error('请先从系列图鉴选择谷子');
-              if (dialog.type === 'purchase' && channel === '拼团' && !linkedItem) {
-                if (!groupChoice) throw Error('请选择已有拼团或创建新团');
-                if (groupChoice === '__new')
-                  payload.newGroup = {
-                    name: payload.newGroupName,
-                    groupOwner: payload.newGroupOwner,
-                    notes: payload.newGroupNotes ?? '',
-                  };
-                else if (itemChoice) payload.groupBuyItemId = itemChoice;
-                else payload.groupId = groupChoice;
-              }
-              delete payload.newGroupName;
-              delete payload.newGroupOwner;
-              delete payload.newGroupNotes;
               await onSave(op, payload);
               onClose();
             } catch (e) {
@@ -423,9 +266,6 @@ export default function ActionForm({
             }
           }}
         >
-          {dialog.type === 'purchaseEdit' && linkedItem && (
-            <input type="hidden" name="purchaseChannel" value="拼团" />
-          )}
           <div className="form-grid">
             {fields.map((f) =>
               f.name === 'productId' ? (
@@ -435,14 +275,6 @@ export default function ActionForm({
                   <button
                     type="button"
                     aria-label="从系列图鉴选择谷子"
-                    disabled={
-                      (!!dialog.id && ['sale', 'purchase'].includes(dialog.type)) ||
-                      dialog.type === 'wantedEdit' ||
-                      (dialog.type === 'purchaseEdit' &&
-                        (purchase?.arrivalStatus === 'ARRIVED' ||
-                          !!purchase?.groupBuyItemId ||
-                          !!purchase?.wantedId))
-                    }
                     onClick={() => setPicking(true)}
                   >
                     {picked ? (
@@ -464,25 +296,11 @@ export default function ActionForm({
               ) : (
                 <label key={f.name}>
                   {f.label}
-                  {f.name === 'purchaseChannel' ? (
-                    <PurchaseChannelPicker
-                      value={channel}
-                      options={f.options ?? []}
-                      disabled={!!linkedItem}
-                      onChange={setChannel}
-                    />
-                  ) : f.options ? (
+                  {f.options ? (
                     <select
                       aria-label={f.label}
                       name={f.name}
-                      defaultValue={
-                        f.name === 'purchaseChannel' ? undefined : (f.value ?? f.options[0]?.[0])
-                      }
-                      value={f.name === 'purchaseChannel' ? channel : undefined}
-                      onChange={
-                        f.name === 'purchaseChannel' ? (e) => setChannel(e.target.value) : undefined
-                      }
-                      disabled={f.name === 'purchaseChannel' && !!linkedItem}
+                      defaultValue={f.value ?? f.options[0]?.[0]}
                       required={f.required !== false}
                     >
                       {f.options.map(([value, label]) => (
@@ -513,100 +331,6 @@ export default function ActionForm({
               ),
             )}
           </div>
-          {dialog.type === 'purchase' && channel === '拼团' && (
-            <fieldset className="purchase-group-fields">
-              <legend>这份谷子来自哪个团？</legend>
-              {linkedItem ? (
-                <>
-                  <input type="hidden" name="purchaseChannel" value="拼团" />
-                  <p>
-                    已关联：{linkedGroup?.name} · {linkedGroup?.groupOwner}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <label>
-                    选择拼团
-                    <select
-                      aria-label="选择拼团"
-                      value={groupChoice}
-                      onChange={(e) => {
-                        setGroupChoice(e.target.value);
-                        setItemChoice('');
-                      }}
-                      required
-                    >
-                      <option value="">请选择已有团，或新建一个团</option>
-                      {data.groups
-                        .filter((g) => g.status === 'OPEN')
-                        .map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name} · {g.groupOwner}
-                          </option>
-                        ))}
-                      <option value="__new">＋ 在这里创建新团</option>
-                    </select>
-                  </label>
-                  {groupChoice === '__new' ? (
-                    <div className="form-grid">
-                      <label>
-                        新团名称
-                        <input
-                          name="newGroupName"
-                          required
-                          maxLength={100}
-                          placeholder="例如：春日系列一团"
-                        />
-                      </label>
-                      <label>
-                        团长 / 主催
-                        <input name="newGroupOwner" required maxLength={100} />
-                      </label>
-                      <label>
-                        拼团备注
-                        <input name="newGroupNotes" maxLength={2000} />
-                      </label>
-                      <p className="notice">
-                        确认保存时一并创建拼团和团内商品，已填写的购入信息会保留。
-                      </p>
-                    </div>
-                  ) : (
-                    groupChoice && (
-                      <>
-                        {availableItems.length > 0 && (
-                          <label>
-                            关联团内商品
-                            <select
-                              value={itemChoice}
-                              onChange={(e) => setItemChoice(e.target.value)}
-                            >
-                              <option value="">新增一条团内商品</option>
-                              {availableItems.map((i) => (
-                                <option key={i.id} value={i.id}>
-                                  已有团项：{i.quantity} 件 · 单价 ¥{i.unitPrice}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                        <p className="notice">
-                          {itemChoice
-                            ? '购入数量需与所选团项一致。'
-                            : '将按本次商品、数量和单价添加团项，并关联购入记录。'}
-                        </p>
-                      </>
-                    )
-                  )}
-                </>
-              )}
-            </fieldset>
-          )}
-          {dialog.wantedId && (
-            <label className="check-row">
-              <input type="checkbox" name="updateWanted" />
-              到货后同步更新收物进度（可选）
-            </label>
-          )}
           {error && (
             <p role="alert" className="error">
               {error}
@@ -634,7 +358,6 @@ export default function ActionForm({
           onClose={() => setPicking(false)}
           onSelect={(p) => {
             setPickedId(p.id);
-            setItemChoice('');
             setPicking(false);
           }}
         />

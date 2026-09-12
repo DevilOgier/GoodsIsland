@@ -36,6 +36,9 @@ import { useSnapshotIndex } from '@/hooks/use-snapshot-index';
 import DashboardPage from './dashboard/dashboard-page';
 import CatalogPage from './catalog/catalog-page';
 import InventoryPage from './inventory/inventory-page';
+import PurchasePage, { PurchaseList } from './purchase/purchase-page';
+import SalePage, { SaleList } from './sale/sale-page';
+import WantedPage from './wanted/wanted-page';
 export default function Cabinet({
   user,
 }: {
@@ -336,118 +339,11 @@ export default function Cabinet({
     </button>
   );
   const recordProduct = (id: string) => (
-    <Link href={'/products/' + id} className="record-product">
+    <Link href={`/products/${id}`} className="record-product">
       {productById(id) && <ProductArt product={productById(id)!} />}
       <strong>{productById(id)?.name ?? '商品'}</strong>
     </Link>
   );
-  function purchasesList(items: Snapshot['purchases'], showImages = true) {
-    return (
-      <CollectionGallery
-        key={path + ':' + (selected?.id ?? '')}
-        heading={status === 'IN_TRANSIT' ? '等待到货' : '买入记录'}
-        defaultMode="list"
-        showImages={showImages}
-        items={items
-          .filter((p) => productById(p.productId))
-          .map((p) => ({
-            id: p.id,
-            product: productById(p.productId)!,
-            badge: statusNames[p.arrivalStatus],
-            summary: (
-              <>
-                <strong>
-                  {p.quantity} 件 · 实际成本 {price(p.actualCost)}
-                </strong>
-                <small>
-                  {p.purchaseChannel} · {p.purchaseDate.slice(0, 10)}
-                </small>
-              </>
-            ),
-            actions: (
-              <>
-                {!['ARRIVED', 'CANCELLED'].includes(p.arrivalStatus) && (
-                  <>
-                    <button
-                      className="small-btn"
-                      onClick={() => act('purchase.arrive', { id: p.id })}
-                    >
-                      确认到货
-                    </button>
-                    <button
-                      className="small-btn"
-                      onClick={() => act('purchase.status', { id: p.id, status: 'CANCELLED' })}
-                    >
-                      取消
-                    </button>
-                  </>
-                )}
-                {p.arrivalStatus !== 'CANCELLED' && actionButton('fees', '补运费', p.id)}
-                {p.arrivalStatus !== 'CANCELLED' &&
-                  actionButton('purchaseEdit', '修改', p.id, p.productId)}
-                <button
-                  className="small-btn danger"
-                  onClick={() => void removePurchase(p.id, productById(p.productId)!.name)}
-                >
-                  <Trash2 size={14} /> 删除
-                </button>
-              </>
-            ),
-            details: (
-              <details className="record-details">
-                <summary>费用与补费记录</summary>
-                <p>
-                  商品金额 {price(p.productAmount)} · 国内运费 {price(p.domesticShipping)} ·
-                  国际运费 {price(p.internationalShipping)} · 其他 {price(p.otherFee)}
-                </p>
-                {p.adjustments.map((a) => (
-                  <p key={a.id}>
-                    +{price(a.amount)} · {a.reason}
-                  </p>
-                ))}
-              </details>
-            ),
-          }))}
-      />
-    );
-  }
-  function salesList(items: Snapshot['sales']) {
-    return items.length ? (
-      <div className="record-list">
-        {items.map((s) => {
-          const cost =
-            Number(s.allocatedActualCost) +
-            s.costAdjustments.reduce((n, a) => n + Number(a.amount), 0);
-          return (
-            <article className="record" key={s.id}>
-              {recordProduct(s.productId)}
-              <div>
-                <small>实际成交</small>
-                <strong>
-                  {s.quantity} 件 · {price(s.totalAmount)}
-                </strong>
-              </div>
-              <div>
-                <small>分摊成本（含补费）</small>
-                <strong>{price(cost)}</strong>
-              </div>
-              <div>
-                <small>本次收益</small>
-                <strong className={Number(s.totalAmount) - cost >= 0 ? 'green' : ''}>
-                  {price(Number(s.totalAmount) - cost)}
-                </strong>
-              </div>
-              <small>
-                {s.saleChannel} · {s.saleDate.slice(0, 10)}
-              </small>
-            </article>
-          );
-        })}
-      </div>
-    ) : (
-      empty('喜欢还在身边，暂时没有成交')
-    );
-  }
   let content: React.ReactNode = null;
   if (data) {
     const visible = filtered.filter((p) => p.status === 'ACTIVE');
@@ -554,11 +450,23 @@ export default function Cabinet({
           <section className="section-heading">
             <h2>买入与费用</h2>
           </section>
-          {purchasesList(snapshotIndex?.purchasesByProductId.get(selected.id) ?? [], false)}
+          <PurchaseList
+            items={snapshotIndex?.purchasesByProductId.get(selected.id) ?? []}
+            status={status}
+            showImages={false}
+            productFor={productById}
+            onAction={(operation, payload) => void act(operation, payload)}
+            onEdit={(id, productId) => setDialog({ type: 'purchaseEdit', id, productId })}
+            onFees={(id) => setDialog({ type: 'fees', id })}
+            onRemove={(id, name) => void removePurchase(id, name)}
+          />
           <section className="section-heading">
             <h2>卖出记录</h2>
           </section>
-          {salesList(snapshotIndex?.salesByProductId.get(selected.id) ?? [])}
+          <SaleList
+            items={snapshotIndex?.salesByProductId.get(selected.id) ?? []}
+            productFor={productById}
+          />
           <section className="section-heading">
             <h2>库存流水</h2>
           </section>
@@ -601,34 +509,29 @@ export default function Cabinet({
       );
     } else if (path === '/purchases')
       content = (
-        <>
-          <div className="page-intro">
-            <span className="eyebrow">PURCHASE STORIES</span>
-            <h1>买入记录</h1>
-            <p>记录每一份相遇，让喜欢都有迹可循。</p>
-          </div>
-          {purchasesList(
-            data.purchases.filter(
-              (p) =>
-                matches(p.productId) &&
-                (!status ||
-                  (status === 'IN_TRANSIT'
-                    ? ['PENDING', 'SHIPPED'].includes(p.arrivalStatus)
-                    : p.arrivalStatus === status)),
-            ),
+        <PurchasePage
+          items={data.purchases.filter(
+            (purchase) =>
+              matches(purchase.productId) &&
+              (!status ||
+                (status === 'IN_TRANSIT'
+                  ? ['PENDING', 'SHIPPED'].includes(purchase.arrivalStatus)
+                  : purchase.arrivalStatus === status)),
           )}
-        </>
+          status={status}
+          productFor={productById}
+          onAction={(operation, payload) => void act(operation, payload)}
+          onEdit={(id, productId) => setDialog({ type: 'purchaseEdit', id, productId })}
+          onFees={(id) => setDialog({ type: 'fees', id })}
+          onRemove={(id, name) => void removePurchase(id, name)}
+        />
       );
     else if (path === '/sales')
       content = (
-        <>
-          <div className="page-intro">
-            <span className="eyebrow">PASSED WITH LOVE</span>
-            <h1>卖出记录</h1>
-            <p>记下每一次成交，也记住喜欢去往了哪里。</p>
-          </div>
-          {salesList(data.sales.filter((s) => matches(s.productId)))}
-        </>
+        <SalePage
+          items={data.sales.filter((sale) => matches(sale.productId))}
+          productFor={productById}
+        />
       );
     else if (path === '/listings') {
       const entries = data.listings.filter(
@@ -690,74 +593,16 @@ export default function Cabinet({
           (!status || status === 'ACTIVE' || w.status === status),
       );
       content = (
-        <>
-          <div className="page-intro">
-            <span className="eyebrow">MY WISH LIST</span>
-            <h1>收物心愿 🌸</h1>
-            <p>把还没遇见的喜欢，先轻轻记在这里。</p>
-          </div>
-          <CollectionGallery
-            heading="正在收"
-            extra={
-              <Link className="primary gallery-poster-link" href="/posters?source=wanted">
-                批量制作收物图
-              </Link>
-            }
-            items={entries.map((w) => ({
-              id: w.id,
-              product: productById(w.productId)!,
-              onOpen: () => setDialog({ type: 'wantedEdit', id: w.id }),
-              badge: statusNames[w.status],
-              summary: (
-                <>
-                  <strong>{w.targetPrice ? price(w.targetPrice) : '价格可议'} / 件</strong>
-                  <small>
-                    已收 {w.fulfilledQuantity} / 想收 {w.wantedQuantity} 件
-                  </small>
-                  <small className={`wanted-priority wanted-priority--${w.priority.toLowerCase()}`}>
-                    {w.priority === 'HIGH' ? '很想要' : w.priority === 'LOW' ? '随缘' : '普通'}
-                  </small>
-                  <small>{w.notes}</small>
-                </>
-              ),
-              actions: (
-                <>
-                  <Link className="small-btn" href={'/posters?source=wanted&id=' + w.id}>
-                    制作收物图
-                  </Link>
-                  <button
-                    className="small-btn"
-                    onClick={() =>
-                      setDialog({ type: 'purchase', productId: w.productId, wantedId: w.id })
-                    }
-                  >
-                    记录买入
-                  </button>
-                  <button
-                    className="small-btn"
-                    onClick={() =>
-                      act('wanted.progress', { id: w.id, fulfilledQuantity: w.wantedQuantity })
-                    }
-                  >
-                    仅标记收齐
-                  </button>
-                  <button
-                    className="small-btn"
-                    onClick={() => setDialog({ type: 'wantedEdit', id: w.id })}
-                  >
-                    修改
-                  </button>
-                  <button
-                    className="small-btn danger"
-                    onClick={() => void removeWanted(w.id, productById(w.productId)!.name)}
-                  >
-                    <Trash2 size={14} /> 删除
-                  </button>
-                </>
-              ),
-            }))}
-          />
-        </>
+        <WantedPage
+          items={entries}
+          productFor={productById}
+          onEdit={(id) => setDialog({ type: 'wantedEdit', id })}
+          onPurchase={(productId, wantedId) => setDialog({ type: 'purchase', productId, wantedId })}
+          onComplete={(id, fulfilledQuantity) =>
+            void act('wanted.progress', { id, fulfilledQuantity })
+          }
+          onRemove={(id, name) => void removeWanted(id, name)}
+        />
       );
     } else if (path === '/groups')
       content = (
