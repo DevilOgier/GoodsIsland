@@ -2,15 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import {
-  Flower2,
-  Search,
-  Plus,
-  SlidersHorizontal,
-  ChevronRight,
-  X,
-  RefreshCw,
-} from 'lucide-react';
+import { Flower2, Search, Plus, SlidersHorizontal, ChevronRight, X, RefreshCw } from 'lucide-react';
 import type { Snapshot, Product } from './types';
 import { createSnapshotCache } from '@/lib/snapshot-cache';
 const snapshotCache = createSnapshotCache<Snapshot>();
@@ -25,6 +17,7 @@ import { AppShell, appNavigation, MoreMenu } from './layout';
 import { Toast } from './ui';
 import type { QuickAction } from './layout/quick-action-sheet';
 import { useSnapshotIndex } from '@/hooks/use-snapshot-index';
+import { useCatalogFilters } from '@/hooks/use-catalog-filters';
 import DashboardPage from './dashboard/dashboard-page';
 import CatalogPage from './catalog/catalog-page';
 import InventoryPage from './inventory/inventory-page';
@@ -53,14 +46,23 @@ export default function Cabinet({
   } | null>(null);
   const [pendingAction, setPendingAction] = useState('');
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [q, setQ] = useState(searchParams.get('q') ?? '');
   const [filter, setFilter] = useState(false);
-  const [ip, setIp] = useState(searchParams.get('ip') ?? '');
-  const [character, setCharacter] = useState(searchParams.get('character') ?? '');
-  const [series, setSeries] = useState(searchParams.get('series') ?? '');
-  const [tag, setTag] = useState(searchParams.get('tag') ?? '');
-  const [type, setType] = useState(searchParams.get('type') ?? '');
-  const [status, setStatus] = useState(searchParams.get('status') ?? '');
+  const {
+    q,
+    ip,
+    character,
+    series,
+    tag,
+    type,
+    status,
+    setQ,
+    setIp,
+    setCharacter,
+    setSeries,
+    setTag,
+    setType,
+    setStatus,
+  } = useCatalogFilters();
   const [imageBusy, setImageBusy] = useState(false);
   const [adminTab, setAdminTab] = useState<AdminTab>('product');
   const load = useCallback(

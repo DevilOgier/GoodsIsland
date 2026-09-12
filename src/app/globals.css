@@ -1460,7 +1460,7 @@ input::placeholder {
 }
 @media (max-width: 640px) {
   body {
-    font-size: 13px;
+    font-size: 14px;
   }
   .hero {
     padding: 27px 23px;
@@ -1468,7 +1468,7 @@ input::placeholder {
     border-radius: 14px;
   }
   .hero .eyebrow {
-    font-size: 6px;
+    font-size: 8px;
     letter-spacing: 1.5px;
     max-width: 150px;
     line-height: 1.7;
@@ -1479,12 +1479,13 @@ input::placeholder {
     letter-spacing: 1px;
   }
   .hero p {
-    font-size: 10px;
+    font-size: 13px;
     max-width: 185px;
   }
   .hero .primary {
-    font-size: 10px;
-    padding: 9px 12px;
+    min-height: 44px;
+    font-size: 13px;
+    padding: 10px 14px;
   }
   .hero-art {
     width: 34%;

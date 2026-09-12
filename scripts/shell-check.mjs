@@ -203,6 +203,16 @@ try {
     (await page.getByRole('button', { name: /周边类型/ }).getAttribute('aria-pressed')) !== 'true'
   )
     throw Error('Catalog should default to merchandise type view');
+  if (shellProduct) {
+    const catalogSearch = page.getByLabel('搜索谷子');
+    await catalogSearch.fill(shellProduct.name);
+    await page.waitForURL((url) => url.searchParams.get('q') === shellProduct.name);
+    await page.reload({ waitUntil: 'networkidle' });
+    if ((await page.getByLabel('搜索谷子').inputValue()) !== shellProduct.name)
+      throw Error('Catalog URL search filter was not restored after reload');
+    await page.getByLabel('搜索谷子').fill('');
+    await page.waitForURL((url) => !url.searchParams.has('q'));
+  }
   await page.getByRole('button', { name: /周边系列/ }).click();
   const seriesHeights = await page
     .locator('.catalog-series-grid > button')
