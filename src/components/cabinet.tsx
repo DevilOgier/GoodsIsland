@@ -4,13 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   Flower2,
-  BookOpen,
-  Archive,
-  ArrowDownLeft,
-  ArrowUpRight,
   Users,
-  Heart,
-  Palette,
   Search,
   Plus,
   SlidersHorizontal,
@@ -26,7 +20,6 @@ import {
 } from 'lucide-react';
 import type { Snapshot, Product } from './types';
 import { createSnapshotCache } from '@/lib/snapshot-cache';
-import { accounting, fixed, localDate } from '@/domain/accounting';
 const snapshotCache = createSnapshotCache<Snapshot>();
 import { price, statusNames } from './types';
 import ProductArt from './product-art';
@@ -36,11 +29,13 @@ import PosterEditor from './poster-editor';
 import CollectionGallery from './collection-gallery';
 import AccountingPanel from './accounting-panel';
 import AccountPanel from './account-panel';
-import CatalogBrowser from './catalog-browser';
 import { AppShell, appNavigation, MoreMenu } from './layout';
 import { EmptyState, Toast } from './ui';
 import type { QuickAction } from './layout/quick-action-sheet';
 import { useSnapshotIndex } from '@/hooks/use-snapshot-index';
+import DashboardPage from './dashboard/dashboard-page';
+import CatalogPage from './catalog/catalog-page';
+import InventoryPage from './inventory/inventory-page';
 export default function Cabinet({
   user,
 }: {
@@ -455,8 +450,6 @@ export default function Cabinet({
   }
   let content: React.ReactNode = null;
   if (data) {
-    const currentMonth = localDate(new Date().toISOString()).slice(0, 7);
-    const monthAccounting = accounting(data, { month: currentMonth });
     const visible = filtered.filter((p) => p.status === 'ACTIVE');
     const owned = visible.filter((p) => {
       const quantity = invFor(p.id)?.currentQuantity ?? 0;
@@ -485,175 +478,13 @@ export default function Cabinet({
     });
     if (path === '/')
       content = (
-        <>
-          <section className="hero">
-            <div>
-              <span className="eyebrow">MY LITTLE COLLECTION ISLAND</span>
-              <h1>你好，{user.name} 🌷</h1>
-              <p>
-                继续收集喜欢的吧。
-                <br />
-                在谷屿，小小的谷子也能拼成闪闪发光的日常。
-              </p>
-              <button className="primary" onClick={() => setDialog({ type: 'purchase' })}>
-                收藏新的喜欢 <Plus size={17} />
-              </button>
-            </div>
-            <div className="hero-art">
-              <div className="paper-note">
-                little things,
-                <br />
-                <i>big happiness.</i>
-                <Flower2 size={36} />
-              </div>
-              <div className="hero-badge">
-                <Flower2 size={86} strokeWidth={1} />
-                <span>MY FAVORITES</span>
-              </div>
-              <span className="sparkle one">✧</span>
-              <span className="sparkle two">✦</span>
-              <span className="hero-caption">YOUR COLLECTION, YOUR STORY.</span>
-            </div>
-          </section>
-          <div className="stats">
-            {[
-              [
-                Archive,
-                '在手谷子',
-                data.inventory.reduce((n, i) => n + i.currentQuantity, 0),
-                '件喜欢',
-              ],
-              [
-                BookOpen,
-                '本月支出',
-                '¥' + fixed(monthAccounting.expense),
-                currentMonth.replace('-', ' 年 ') + ' 月',
-              ],
-              [
-                Package,
-                '等待到货',
-                data.purchases
-                  .filter((p) => ['PENDING', 'SHIPPED'].includes(p.arrivalStatus))
-                  .reduce((n, p) => n + p.quantity, 0),
-                '件待到货',
-              ],
-              [
-                Heart,
-                '拼团待处理',
-                data.groups
-                  .flatMap((group) => group.items)
-                  .filter(
-                    (item) =>
-                      item.dispatchStatus === 'NOT_DISPATCHED' &&
-                      item.purchase?.arrivalStatus !== 'CANCELLED',
-                  ).length,
-                '项待跟进',
-              ],
-            ].map(([Icon, label, value, unit], i) => {
-              const I = Icon as typeof Archive;
-              return (
-                <Link
-                  className="stat stat-link"
-                  key={i}
-                  href={
-                    [
-                      '/inventory?status=stock',
-                      '/accounting',
-                      '/purchases?status=IN_TRANSIT',
-                      '/groups',
-                    ][i]
-                  }
-                  onClick={() => setStatus(i === 0 ? 'stock' : i === 2 ? 'IN_TRANSIT' : '')}
-                  aria-label={'查看' + String(label)}
-                >
-                  <span className={'stat-icon tone-' + i}>
-                    <I size={20} />
-                  </span>
-                  <div>
-                    <small>{String(label)}</small>
-                    <strong>
-                      {String(value)} <span>{String(unit)}</span>
-                    </strong>
-                  </div>
-                  <ChevronRight className="stat-arrow" size={15} />
-                </Link>
-              );
-            })}
-          </div>
-          <section className="section-heading">
-            <div>
-              <span className="eyebrow">ON YOUR SHELF</span>
-              <h2>
-                收藏柜的一角{' '}
-                <span>{data.inventory.filter((i) => i.currentQuantity > 0).length}</span>
-              </h2>
-            </div>
-            <Link href="/inventory">
-              查看全部 <ArrowRight size={16} />
-            </Link>
-          </section>
-          {data.inventory.some((i) => i.currentQuantity > 0)
-            ? cards(all.filter((p) => (invFor(p.id)?.currentQuantity ?? 0) > 0).slice(0, 4))
-            : empty('收藏柜等着第一份喜欢', '记录买入', () => setDialog({ type: 'purchase' }))}
-          <div className="dashboard-bottom">
-            <section className="mini-panel">
-              <h3>
-                <ArrowDownLeft size={18} /> 最近买入
-              </h3>
-              {data.purchases.slice(0, 3).map((p) => (
-                <div className="mini-row" key={p.id}>
-                  <span>{productById(p.productId)?.name}</span>
-                  <strong>{price(p.actualCost)}</strong>
-                </div>
-              ))}
-              {!data.purchases.length && <p className="muted">每一次心动，都值得被记录。</p>}
-            </section>
-            <section className="mini-panel">
-              <h3>
-                <ArrowUpRight size={18} /> 最近卖出
-              </h3>
-              {data.sales.slice(0, 3).map((s) => (
-                <div className="mini-row" key={s.id}>
-                  <span>{productById(s.productId)?.name}</span>
-                  <strong>{price(s.totalAmount)}</strong>
-                </div>
-              ))}
-              {!data.sales.length && <p className="muted">让喜欢在新的收藏柜里延续。</p>}
-            </section>
-            <Link href="/posters" className="workshop-promo">
-              <Palette size={27} />
-              <h3>给喜欢做一张海报</h3>
-              <p>收物 / 出物 · 四款手帐模板</p>
-              <span>
-                去海报工坊 <ArrowUpRight size={16} />
-              </span>
-            </Link>
-          </div>
-          <div className="dashboard-poster-links">
-            <Link href="/wanted?status=ACTIVE">逛逛收物心愿 →</Link>
-            <Link href="/posters?source=wanted">生成我的收物图 →</Link>
-            <Link href="/listings?status=ACTIVE">查看正在出物 →</Link>
-            <Link href="/posters?source=listings">生成我的出物图 →</Link>
-          </div>
-          <div className="summary-strip">
-            待排发{' '}
-            {
-              data.groups
-                .flatMap((g) => g.items)
-                .filter(
-                  (i) =>
-                    i.dispatchStatus === 'NOT_DISPATCHED' &&
-                    i.purchase?.arrivalStatus !== 'CANCELLED',
-                ).length
-            }{' '}
-            项 <span>·</span> 正在出物{' '}
-            {data.listings
-              .filter((l) => l.status === 'ACTIVE')
-              .reduce((n, l) => n + l.remainingQuantity, 0)}{' '}
-            件 <span>·</span> 当前库存成本{' '}
-            {price(data.inventory.reduce((n, i) => n + Number(i.currentCost), 0))}
-          </div>
-        </>
+        <DashboardPage
+          data={data}
+          index={snapshotIndex!}
+          userName={user.name}
+          onPurchase={(productId) => setDialog({ type: 'purchase', productId })}
+          onInventoryStatus={setStatus}
+        />
       );
     else if (selected) {
       const inv = invFor(selected.id);
@@ -746,101 +577,27 @@ export default function Cabinet({
           </div>
         </>
       );
-    } else if (path === '/products' || path === '/inventory') {
-      const list = path === '/inventory' ? owned : visible;
+    } else if (path === '/products') {
       content = (
-        <>
-          <div className="page-intro">
-            <span className="eyebrow">
-              {path === '/inventory' ? 'YOUR OWN LITTLE TREASURES' : 'THE COLLECTION ENCYCLOPEDIA'}
-            </span>
-            <h1>{path === '/inventory' ? '我的收藏柜 🌷' : '谷子图鉴 📖'}</h1>
-            <p>
-              {path === '/inventory'
-                ? '这些是我用热爱一点点收集起来的宝物。'
-                : '收录每一份心动的谷子。'}
-            </p>
-          </div>
-          {path === '/inventory' && (
-            <div className="inventory-overview-stats">
-              <Link href="/inventory?status=stock" onClick={() => setStatus('stock')}>
-                <span>总库存件数</span>
-                <strong>
-                  {data.inventory.reduce((sum, item) => sum + item.currentQuantity, 0)}
-                </strong>
-              </Link>
-              <Link href="/purchases?status=ARRIVED" onClick={() => setStatus('ARRIVED')}>
-                <span>已到货记录</span>
-                <strong>
-                  {data.purchases
-                    .filter((item) => item.arrivalStatus === 'ARRIVED')
-                    .reduce((sum, item) => sum + item.quantity, 0)}
-                </strong>
-              </Link>
-              <Link href="/inventory?status=IN_TRANSIT" onClick={() => setStatus('IN_TRANSIT')}>
-                <span>等待到货</span>
-                <strong>
-                  {data.purchases
-                    .filter((item) => ['PENDING', 'SHIPPED'].includes(item.arrivalStatus))
-                    .reduce((sum, item) => sum + item.quantity, 0)}
-                </strong>
-              </Link>
-              <Link href="/accounting" onClick={() => setStatus('')}>
-                <span>当前库存投入</span>
-                <strong>
-                  {price(data.inventory.reduce((sum, item) => sum + Number(item.currentCost), 0))}
-                </strong>
-              </Link>
-            </div>
-          )}
-          {list.length ? (
-            <CatalogBrowser
-              heading={path === '/inventory' ? '我的收藏' : '谷子图鉴'}
-              inventory={path === '/inventory'}
-              items={list.map((p) => ({
-                id: p.id,
-                product: p,
-                badge: p.typeDefinition.name,
-                summary: (
-                  <>
-                    <strong>
-                      {invFor(p.id)?.currentQuantity
-                        ? `拥有 ×${invFor(p.id)!.currentQuantity}`
-                        : '未拥有'}
-                    </strong>
-                    {path === '/inventory' && awaitingArrivalFor(p.id) > 0 && (
-                      <small>等待到货 ×{awaitingArrivalFor(p.id)}</small>
-                    )}
-                    {path === '/inventory' && (
-                      <small>
-                        均价{' '}
-                        {price(
-                          invFor(p.id)?.currentQuantity
-                            ? Number(invFor(p.id)!.currentCost) / invFor(p.id)!.currentQuantity
-                            : 0,
-                        )}{' '}
-                        · 挂出 {listingCount(p.id)} 件
-                      </small>
-                    )}
-                  </>
-                ),
-                actions: (
-                  <button
-                    className="small-btn"
-                    onClick={() => setDialog({ type: 'purchase', productId: p.id })}
-                  >
-                    记录买入
-                  </button>
-                ),
-                quantity: invFor(p.id)?.currentQuantity ?? 0,
-              }))}
-            />
-          ) : (
-            empty('这里还没有谷子', path === '/inventory' ? '记录买入' : '添加商品', () =>
-              setDialog({ type: path === '/inventory' ? 'purchase' : 'product' }),
-            )
-          )}
-        </>
+        <CatalogPage
+          products={visible}
+          quantityFor={(id) => invFor(id)?.currentQuantity ?? 0}
+          onPurchase={(productId) => setDialog({ type: 'purchase', productId })}
+          onAddProduct={() => setDialog({ type: 'product' })}
+        />
+      );
+    } else if (path === '/inventory') {
+      content = (
+        <InventoryPage
+          data={data}
+          products={owned}
+          quantityFor={(id) => invFor(id)?.currentQuantity ?? 0}
+          costFor={(id) => Number(invFor(id)?.currentCost ?? 0)}
+          awaitingFor={awaitingArrivalFor}
+          listingFor={listingCount}
+          onPurchase={(productId) => setDialog({ type: 'purchase', productId })}
+          onStatus={setStatus}
+        />
       );
     } else if (path === '/purchases')
       content = (
