@@ -1,30 +1,6 @@
 import { posterTemplateRegistry, posterTemplates } from '@/poster/registry';
-import { renderPoster, ratios } from '@/poster/renderer';
+import { ratios } from '@/poster/renderer';
 import type { PosterRenderOptions } from '@/poster/types';
-
-const sampleItems = [
-  { productId: 'sample-1', name: '星月系列吧唧', quantity: 2, price: '35', note: '无伤优先' },
-  { productId: 'sample-2', name: '夜航纪念立牌', quantity: 1, price: '68', note: '可小刀' },
-];
-const thumbnailCache = new Map<string, string>();
-
-function templateThumbnail(template: string, config: PosterRenderOptions) {
-  const key = `${template}:${config.palette}`;
-  const cached = thumbnailCache.get(key);
-  if (cached) return cached;
-  const svg = renderPoster({
-    title: '今日心动收藏',
-    type: 'WANTED',
-    ratio: '3:4',
-    template,
-    version: 3,
-    config,
-    items: sampleItems,
-  });
-  const uri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-  thumbnailCache.set(key, uri);
-  return uri;
-}
 
 export function TemplateSelector({
   ratio,
@@ -73,17 +49,8 @@ export function TemplateSelector({
             key={item.id}
             onClick={() => onTemplateChange(item.id)}
           >
-            <span className="template-card__preview">
-              <img
-                src={templateThumbnail(item.id, item.defaultOptions)}
-                alt=""
-                loading="lazy"
-                decoding="async"
-              />
-            </span>
             <strong>{item.name}</strong>
             <small>{item.description}</small>
-            <em>{item.recommendedItems}</em>
           </button>
         ))}
       </div>
@@ -105,62 +72,6 @@ export function TemplateSelector({
             </button>
           ))}
         </div>
-
-        <h3>06 / 信息密度</h3>
-        <div className="poster-option-row">
-          {[
-            ['IMAGE_FIRST', '图片优先'],
-            ['BALANCED', '平衡'],
-            ['INFO_FIRST', '信息优先'],
-          ].map(([value, label]) => (
-            <button
-              type="button"
-              key={value}
-              className={config.density === value ? 'selected' : ''}
-              aria-pressed={config.density === value}
-              onClick={() =>
-                onConfigChange({
-                  ...config,
-                  density: value as PosterRenderOptions['density'],
-                })
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <h3>07 / 显示设置</h3>
-        <div className="poster-option-row">
-          {[
-            ['PRICE_PROMINENT', '价格突出'],
-            ['PRICE_NORMAL', '价格普通'],
-            ['PRICE_HIDDEN', '隐藏价格'],
-          ].map(([value, label]) => (
-            <button
-              type="button"
-              key={value}
-              className={config.priceStyle === value ? 'selected' : ''}
-              aria-pressed={config.priceStyle === value}
-              onClick={() =>
-                onConfigChange({
-                  ...config,
-                  priceStyle: value as PosterRenderOptions['priceStyle'],
-                })
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <label className="poster-note-toggle">
-          <input
-            type="checkbox"
-            checked={config.showNote}
-            onChange={(event) => onConfigChange({ ...config, showNote: event.target.checked })}
-          />
-          海报中显示备注
-        </label>
       </div>
     </section>
   );

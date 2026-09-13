@@ -160,7 +160,7 @@ function renderCard(
   index: number,
 ) {
   const { x, y, width, height, rotation } = placement;
-  const padding = clamp(10, width * 0.045, 25);
+  const padding = clamp(14, width * 0.06, 30);
   const compact = height < 310 || width < 300;
   const imageHeight = clamp(
     54,
@@ -170,11 +170,11 @@ function renderCard(
   const innerWidth = width - padding * 2;
   const titleSize = clamp(compact ? 13 : 16, Math.min(width / 13, height / 17), 30);
   const titleLines = wrapText(item.name, Math.max(7, innerWidth / titleSize), compact ? 1 : 2);
-  const titleStart = padding + imageHeight + titleSize * 1.05;
-  const tradeY = Math.min(
-    height - padding - (options.showNote && item.note && !compact ? 30 : 5),
-    titleStart + titleLines.length * titleSize * 1.22 + titleSize * 0.85,
-  );
+  const titleStart = padding + imageHeight + titleSize * 1.48;
+  const hasNote = Boolean(options.showNote && item.note && !compact);
+  const minimumTradeY = titleStart + titleLines.length * titleSize * 1.22 + titleSize * 1.2;
+  const bottomAlignedTradeY = height - (hasNote ? padding + 31 : padding * 1.35);
+  const tradeY = Math.min(height - padding, Math.max(minimumTradeY, bottomAlignedTradeY));
   const amountSize = priceFont(options.priceStyle, width, height);
   const quantityWidth = clamp(46, width * 0.18, 92);
   const clipId = `polaroid-image-${index}`;
@@ -219,7 +219,7 @@ function renderCard(
       anchor: 'middle',
     },
   );
-  if (options.showNote && note && !compact && height - tradeY > 35)
+  if (hasNote && height - tradeY > 35)
     output += text(padding, height - padding * 0.65, note, {
       size: clamp(11, titleSize * 0.58, 16),
       fill: palette.muted,
