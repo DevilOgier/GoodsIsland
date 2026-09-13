@@ -806,9 +806,9 @@
 
 @font-face {
   font-family: 'Goods Island Chinese Hand';
-  src: url('/fonts/LXGWWenKaiLite-Regular.ttf') format('truetype');
+  src: url('/fonts/LXGWWenKaiLite-Regular.woff2') format('woff2');
   font-weight: 400;
-  font-display: swap;
+  font-display: block;
 }
 
 .poster-preview__svg {

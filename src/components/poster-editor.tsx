@@ -57,6 +57,22 @@ export default function PosterEditor({
   const [items, setItems] = useState<PosterItemData[]>(initial.items);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const [posterFontReady, setPosterFontReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    document.fonts
+      .load("400 32px 'Goods Island Chinese Hand'", '出一些心动收藏谷子名称价格')
+      .then(() => {
+        if (!cancelled) setPosterFontReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setPosterFontReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const productMap = useMemo(
     () => new Map(data.products.map((product) => [product.id, product])),
@@ -352,6 +368,7 @@ export default function PosterEditor({
           </button>
         </section>
         <PosterPreview
+          key={posterFontReady ? 'poster-font-ready' : 'poster-font-loading'}
           svg={rendered.svg}
           error={rendered.error}
           ratio={ratio}

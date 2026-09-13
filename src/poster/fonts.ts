@@ -9,7 +9,7 @@ export const posterFontAssets = {
   sans: '/fonts/NunitoSans-Variable.ttf',
   serif: '/fonts/PlayfairDisplay-Variable.ttf',
   handwriting: '/fonts/Caveat-Variable.ttf',
-  chineseHandwriting: '/fonts/LXGWWenKaiLite-Regular.ttf',
+  chineseHandwriting: '/fonts/LXGWWenKaiLite-Regular.woff2',
 } as const;
 
 export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAssets, string>>) {
@@ -24,7 +24,7 @@ export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAsset
       ? `@font-face{font-family:'Goods Island Hand';src:url('${sources.handwriting}') format('truetype');font-weight:400 700;font-display:swap}`
       : '',
     sources.chineseHandwriting
-      ? `@font-face{font-family:'Goods Island Chinese Hand';src:url('${sources.chineseHandwriting}') format('truetype');font-weight:400;font-display:swap}`
+      ? `@font-face{font-family:'Goods Island Chinese Hand';src:url('${sources.chineseHandwriting}') format('woff2');font-weight:400;font-display:block}`
       : '',
   ].join('');
 }
