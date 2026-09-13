@@ -35,7 +35,7 @@ function items(count: number): PosterData['items'] {
 test('四个 V3 模板覆盖常用比例、商品数量和文本边界', () => {
   for (const template of ['polaroid', 'invitation', 'gingham', 'resume']) {
     for (const ratio of ['1:1', '3:4', '4:3']) {
-      for (const count of [1, 2, 4, 8]) {
+      for (const count of [1, 2, 3, 4, 6, 8]) {
         const svg = renderPoster({
           title: '今日心动收藏',
           type: count % 2 ? 'WANTED' : 'SALE',

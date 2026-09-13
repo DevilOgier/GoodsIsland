@@ -867,6 +867,13 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Goods Island Chinese Hand';
+  src: url('/fonts/LXGWWenKaiLite-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+
 .poster-preview__svg {
   width: 100%;
   max-height: 680px;

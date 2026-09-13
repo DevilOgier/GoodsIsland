@@ -1,7 +1,7 @@
 export const fontRoles = {
   sans: "'Goods Island Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
   serif: "'Goods Island Serif', 'Noto Serif SC', 'Songti SC', 'SimSun', serif",
-  handwriting: "'Goods Island Hand', 'Kaiti SC', 'STKaiti', serif",
+  handwriting: "'Goods Island Chinese Hand', 'Goods Island Hand', 'Kaiti SC', 'STKaiti', serif",
   mono: "'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
 } as const;
 
@@ -9,6 +9,7 @@ export const posterFontAssets = {
   sans: '/fonts/NunitoSans-Variable.ttf',
   serif: '/fonts/PlayfairDisplay-Variable.ttf',
   handwriting: '/fonts/Caveat-Variable.ttf',
+  chineseHandwriting: '/fonts/LXGWWenKaiLite-Regular.ttf',
 } as const;
 
 export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAssets, string>>) {
@@ -21,6 +22,9 @@ export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAsset
       : '',
     sources.handwriting
       ? `@font-face{font-family:'Goods Island Hand';src:url('${sources.handwriting}') format('truetype');font-weight:400 700;font-display:swap}`
+      : '',
+    sources.chineseHandwriting
+      ? `@font-face{font-family:'Goods Island Chinese Hand';src:url('${sources.chineseHandwriting}') format('truetype');font-weight:400;font-display:swap}`
       : '',
   ].join('');
 }
