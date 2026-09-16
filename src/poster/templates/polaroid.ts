@@ -8,9 +8,16 @@ import type {
   PosterRenderOptions,
   PosterTemplate,
 } from '../types';
-import { image, posterSvg, priceLabel, text, wrapText } from '../utils';
+import { image, measureTextWidth, posterSvg, priceLabel, text, wrapText } from '../utils';
 
-type Placement = { x: number; y: number; width: number; height: number; rotation: number };
+type Placement = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  safeInsets?: { right?: number; bottom?: number };
+};
 const clamp = (min: number, value: number, max: number) => Math.max(min, Math.min(value, max));
 
 function placements(count: number, width: number, height: number, top: number, bottom: number) {
@@ -37,6 +44,7 @@ function placements(count: number, width: number, height: number, top: number, b
         width: cardWidth,
         height: areaHeight * 0.9,
         rotation: -3.8,
+        safeInsets: { right: cardWidth * 0.18 },
       },
       {
         x: margin + areaWidth * (landscape ? 0.51 : 0.48),
@@ -49,7 +57,14 @@ function placements(count: number, width: number, height: number, top: number, b
   } else if (count === 3) {
     if (landscape) {
       result.push(
-        { x: margin, y: top, width: areaWidth * 0.49, height: areaHeight * 0.94, rotation: -2.8 },
+        {
+          x: margin,
+          y: top,
+          width: areaWidth * 0.49,
+          height: areaHeight * 0.94,
+          rotation: -2.8,
+          safeInsets: { right: areaWidth * 0.049 },
+        },
         {
           x: margin + areaWidth * 0.52,
           y: top + areaHeight * 0.01,
@@ -73,6 +88,7 @@ function placements(count: number, width: number, height: number, top: number, b
           width: areaWidth * 0.76,
           height: areaHeight * 0.49,
           rotation: -2.2,
+          safeInsets: { bottom: areaHeight * 0.06 },
         },
         {
           x: margin,
@@ -80,6 +96,7 @@ function placements(count: number, width: number, height: number, top: number, b
           width: areaWidth * 0.48,
           height: areaHeight * 0.46,
           rotation: 2.2,
+          safeInsets: { right: areaWidth * 0.035 },
         },
         {
           x: margin + areaWidth * 0.5,
@@ -127,7 +144,7 @@ function background(width: number, height: number, palette: PosterPalette) {
 function ornaments(width: number, height: number, palette: PosterPalette, count: number) {
   const scale = Math.min(width, height) / 1080;
   const flower = `<g transform="translate(${width * 0.9} ${height * 0.72}) rotate(9) scale(${scale})" fill="none" stroke="${palette.primary}" stroke-width="4" stroke-linecap="round" opacity=".78"><path d="M0 210C44 151 48 90 101 16M45 132C20 122 4 105-8 81M61 92c32-7 54-25 66-51M88 38C72 19 70 2 74-15"/><path d="M-8 81c20-8 37-3 48 15-20 6-37 1-48-15Zm69 11c22-8 43-2 56 16-23 7-42 1-56-16Z" fill="${palette.primary}" opacity=".25"/><g fill="${palette.surface}" stroke="${palette.secondary}"><circle cx="101" cy="16" r="14"/><circle cx="91" cy="5" r="10"/><circle cx="112" cy="1" r="10"/><circle cx="117" cy="21" r="10"/></g></g>`;
-  const stamp = `<g transform="translate(${width * 0.075} ${height * 0.77}) rotate(-13)"><circle r="${62 * scale}" fill="${palette.surface}" opacity=".72" stroke="${palette.primary}" stroke-width="3"/><circle r="${52 * scale}" fill="none" stroke="${palette.primary}" stroke-width="1" stroke-dasharray="5 4"/>${text(0, -5 * scale, 'COLLECT', { size: 14 * scale, fill: palette.primary, family: fontRoles.serif, weight: 700, anchor: 'middle', letterSpacing: 2 })}${text(0, 17 * scale, 'WITH LOVE', { size: 10 * scale, fill: palette.primary, family: fontRoles.serif, anchor: 'middle', letterSpacing: 1.5 })}</g>`;
+  const stamp = `<g transform="translate(${width * 0.075} ${height * 0.77}) rotate(-13)"><circle r="${62 * scale}" fill="${palette.surface}" opacity=".72" stroke="${palette.primary}" stroke-width="3"/><circle r="${52 * scale}" fill="none" stroke="${palette.primary}" stroke-width="1" stroke-dasharray="5 4"/>${text(0, -5 * scale, 'COLLECT', { size: 14 * scale, fill: palette.primary, family: fontRoles.handwriting, weight: 700, anchor: 'middle', letterSpacing: 2 })}${text(0, 17 * scale, 'WITH LOVE', { size: 10 * scale, fill: palette.primary, family: fontRoles.handwriting, anchor: 'middle', letterSpacing: 1.5 })}</g>`;
   const cherries = `<g transform="translate(${width * 0.87} ${height * 0.88}) rotate(8) scale(${scale})"><path d="M35 55C37 27 53 13 72 10M35 55C23 32 10 24-5 29" fill="none" stroke="${palette.primary}" stroke-width="4"/><circle cx="20" cy="78" r="21" fill="${palette.price}" opacity=".88"/><circle cx="57" cy="80" r="21" fill="${palette.secondary}"/><path d="M70 10c11-8 20-6 25 1-9 8-18 9-25-1Z" fill="${palette.primary}"/></g>`;
   return `${flower}${stamp}${count > 1 ? cherries : ''}`;
 }
@@ -139,7 +156,7 @@ function titleBlock(data: PosterData, width: number, height: number, palette: Po
   const title = data.title || (data.type === 'WANTED' ? '收一些心动收藏' : '出一些心动收藏');
   const typeLabel =
     data.type === 'WANTED' ? 'LOOKING FOR LITTLE JOYS' : 'GOODS FOR A BRIGHTER TOMORROW';
-  return `<g transform="rotate(-1 ${x} ${height * 0.08})"><path d="M${x - width * 0.27} ${height * 0.025} L${x + width * 0.27} ${height * 0.02} L${x + width * 0.29} ${height * 0.145} L${x - width * 0.29} ${height * 0.15}Z" fill="${palette.surface}" opacity=".92" filter="url(#paper-shadow)"/><rect x="${x - width * 0.035}" y="${height * 0.01}" width="${width * 0.07}" height="${height * 0.027}" fill="${palette.primary}" opacity=".24" transform="rotate(3 ${x} ${height * 0.02})"/>${text(x, height * 0.052, typeLabel, { size: clamp(10, width * 0.009, 16), fill: palette.primary, family: fontRoles.serif, weight: 700, anchor: 'middle', letterSpacing: 3 })}${text(x, height * 0.117, title, { size: titleSize, fill: palette.text, family: fontRoles.handwriting, weight: 700, anchor: 'middle' })}<path d="M${x - width * 0.17} ${height * 0.132} Q${x} ${height * 0.115} ${x + width * 0.18} ${height * 0.134}" fill="none" stroke="${palette.secondary}" stroke-width="6" stroke-linecap="round" opacity=".72"/></g>`;
+  return `<g transform="rotate(-1 ${x} ${height * 0.08})"><path d="M${x - width * 0.27} ${height * 0.025} L${x + width * 0.27} ${height * 0.02} L${x + width * 0.29} ${height * 0.145} L${x - width * 0.29} ${height * 0.15}Z" fill="${palette.surface}" opacity=".92" filter="url(#paper-shadow)"/><rect x="${x - width * 0.035}" y="${height * 0.01}" width="${width * 0.07}" height="${height * 0.027}" fill="${palette.primary}" opacity=".24" transform="rotate(3 ${x} ${height * 0.02})"/>${text(x, height * 0.052, typeLabel, { size: clamp(10, width * 0.009, 16), fill: palette.primary, family: fontRoles.handwriting, weight: 700, anchor: 'middle', letterSpacing: 3 })}${text(x, height * 0.117, title, { size: titleSize, fill: palette.text, family: fontRoles.handwriting, weight: 700, anchor: 'middle' })}<path d="M${x - width * 0.17} ${height * 0.132} Q${x} ${height * 0.115} ${x + width * 0.18} ${height * 0.134}" fill="none" stroke="${palette.secondary}" stroke-width="6" stroke-linecap="round" opacity=".72"/></g>`;
 }
 
 function priceFont(style: PosterPriceStyle, cardWidth: number, cardHeight: number) {
@@ -168,15 +185,34 @@ function renderCard(
     height - (compact ? 92 : 140),
   );
   const innerWidth = width - padding * 2;
+  const safeRight = clamp(0, placement.safeInsets?.right ?? 0, innerWidth * 0.3);
+  const safeBottom = clamp(0, placement.safeInsets?.bottom ?? 0, height * 0.2);
+  const safeInnerWidth = innerWidth - safeRight;
   const titleSize = clamp(compact ? 13 : 16, Math.min(width / 13, height / 17), 30);
-  const titleLines = wrapText(item.name, Math.max(7, innerWidth / titleSize), compact ? 1 : 2);
+  const titleLines = wrapText(item.name, Math.max(7, safeInnerWidth / titleSize), compact ? 1 : 2);
   const titleStart = padding + imageHeight + titleSize * 1.48;
   const hasNote = Boolean(options.showNote && item.note && !compact);
   const minimumTradeY = titleStart + titleLines.length * titleSize * 1.22 + titleSize * 1.2;
-  const bottomAlignedTradeY = height - (hasNote ? padding + 31 : padding * 1.35);
+  const bottomAlignedTradeY = height - safeBottom - (hasNote ? padding + 31 : padding * 1.35);
   const tradeY = Math.min(height - padding, Math.max(minimumTradeY, bottomAlignedTradeY));
-  const amountSize = priceFont(options.priceStyle, width, height);
-  const quantityWidth = clamp(46, width * 0.18, 92);
+  const price = priceLabel(data, item);
+  let amountSize = priceFont(options.priceStyle, width, height);
+  const quantityText = `×${item.quantity}`;
+  const quantitySize = clamp(14, titleSize * 0.92, 28);
+  const quantityPadding = clamp(10, width * 0.035, 18);
+  const quantityWidth = clamp(
+    46,
+    measureTextWidth(quantityText, quantitySize) + quantityPadding * 2,
+    Math.min(124, safeInnerWidth * 0.38),
+  );
+  const quantityRight = padding + safeInnerWidth;
+  const quantityLeft = quantityRight - quantityWidth;
+  const priceRight = quantityLeft - clamp(10, width * 0.025, 18);
+  const priceAvailable = Math.max(42, priceRight - padding);
+  const measuredPrice = measureTextWidth(price, amountSize);
+  if (measuredPrice > priceAvailable) {
+    amountSize = Math.max(12, amountSize * (priceAvailable / measuredPrice));
+  }
   const clipId = `polaroid-image-${index}`;
   const tape = index % 3 === 1 ? palette.secondary : palette.primary;
   const note = item.note.length > 20 ? `${item.note.slice(0, 19)}…` : item.note;
@@ -198,27 +234,29 @@ function renderCard(
     });
   });
   if (options.priceStyle !== 'PRICE_HIDDEN') {
-    output += text(padding, tradeY, priceLabel(data, item), {
+    output += text(padding, tradeY, price, {
       size: amountSize,
       fill: palette.price,
       family: fontRoles.handwriting,
       weight: 800,
     });
-    output += `<path d="M${padding} ${tradeY + 7} Q${padding + innerWidth * 0.28} ${tradeY + 1} ${padding + innerWidth * 0.56} ${tradeY + 7}" fill="none" stroke="${palette.secondary}" stroke-width="${clamp(3, amountSize * 0.13, 7)}" stroke-linecap="round" opacity=".75"/>`;
+    const underlineRight = Math.min(priceRight, padding + safeInnerWidth * 0.56);
+    output += `<path d="M${padding} ${tradeY + 7} Q${(padding + underlineRight) / 2} ${tradeY + 1} ${underlineRight} ${tradeY + 7}" fill="none" stroke="${palette.secondary}" stroke-width="${clamp(3, amountSize * 0.13, 7)}" stroke-linecap="round" opacity=".75"/>`;
   }
-  output += `<path d="M${width - padding - quantityWidth - 5} ${tradeY - titleSize * 0.95} L${width - padding + 3} ${tradeY - titleSize * 1.05} L${width - padding - 2} ${tradeY + 8} L${width - padding - quantityWidth} ${tradeY + 4}Z" fill="${palette.primary}" opacity=".82"/>`;
+  output += `<g data-quantity-label="${quantityText}" data-quantity-left="${quantityLeft}" data-quantity-right="${quantityRight}" data-quantity-width="${quantityWidth}" data-price-right="${priceRight}" data-safe-right="${safeRight}" data-card-width="${width}"><path d="M${quantityLeft - 5} ${tradeY - titleSize * 0.95} L${quantityRight + 3} ${tradeY - titleSize * 1.05} L${quantityRight - 2} ${tradeY + 8} L${quantityLeft} ${tradeY + 4}Z" fill="${palette.primary}" opacity=".82"/>`;
   output += text(
-    width - padding - quantityWidth / 2,
+    quantityLeft + quantityWidth / 2,
     tradeY - titleSize * 0.08,
-    `×${item.quantity}`,
+    quantityText,
     {
-      size: clamp(14, titleSize * 0.92, 28),
+      size: quantitySize,
       fill: '#fffdf8',
       family: fontRoles.handwriting,
       weight: 700,
       anchor: 'middle',
     },
   );
+  output += '</g>';
   if (hasNote && height - tradeY > 35)
     output += text(padding, height - padding * 0.65, note, {
       size: clamp(11, titleSize * 0.58, 16),
@@ -248,6 +286,7 @@ export const polaroidTemplate: PosterTemplate = {
     numeric: fontRoles.handwriting,
     handwriting: fontRoles.handwriting,
   },
+  exportFonts: ['chineseHandwriting', 'sans'],
   palettes: [
     {
       id: 'cream',
@@ -297,7 +336,7 @@ export const polaroidTemplate: PosterTemplate = {
     const cards = data.items
       .map((item, index) => renderCard(data, options, palette, item, layout[index], index))
       .join('');
-    const footer = `${text(width * 0.055, height - 17, 'GOODSISLAND · POLAROID SCRAPBOOK', { size: clamp(9, width * 0.008, 13), fill: palette.muted, family: fontRoles.serif, letterSpacing: 1.8 })}${text(width * 0.945, height - 17, `VOL. ${String(data.items.length).padStart(3, '0')}`, { size: clamp(9, width * 0.008, 13), fill: palette.muted, family: fontRoles.serif, anchor: 'end', letterSpacing: 1.8 })}`;
+    const footer = `${text(width * 0.055, height - 17, 'GOODSISLAND · POLAROID SCRAPBOOK', { size: clamp(9, width * 0.008, 13), fill: palette.muted, family: fontRoles.handwriting, letterSpacing: 1.8 })}${text(width * 0.945, height - 17, `VOL. ${String(data.items.length).padStart(3, '0')}`, { size: clamp(9, width * 0.008, 13), fill: palette.muted, family: fontRoles.handwriting, anchor: 'end', letterSpacing: 1.8 })}`;
     return posterSvg(
       width,
       height,

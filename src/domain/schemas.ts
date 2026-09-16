@@ -55,9 +55,17 @@ export const feeSchema = z.object({
   otherFee: amount.default('0'),
   reason: z.string().min(1, '请填写补费原因').max(500),
 });
+const nullableCalendarDate = z
+  .preprocess(
+    (value) => (value === '' || value === undefined ? null : value),
+    z.union([z.iso.date(), z.null()]),
+  )
+  .transform((value) => (value ? new Date(value + 'T00:00:00.000Z') : null));
+
 export const productSchema = z.object({
   seriesId: uuid,
   productType: z.string().min(1).max(100),
+  releaseDate: nullableCalendarDate,
   appearanceKey: z.string().min(1).max(100).default('default'),
   description: z.string().max(2000).default(''),
   tagIds: z.array(uuid).max(20).default([]),

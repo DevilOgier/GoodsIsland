@@ -22,7 +22,14 @@ export async function snapshot(userId: string) {
     jobs,
     productTypes,
   ] = await Promise.all([
-    db.product.findMany({ include: productInclude, orderBy: { createdAt: 'desc' } }),
+    db.product.findMany({
+      include: productInclude,
+      orderBy: [
+        { releaseDate: { sort: 'desc', nulls: 'last' } },
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ],
+    }),
     db.iP.findMany(),
     db.character.findMany(),
     db.series.findMany(),

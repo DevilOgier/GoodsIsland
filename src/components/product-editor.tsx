@@ -57,6 +57,7 @@ export default function ProductEditor({
                 ...(savedId ? { id: savedId } : {}),
                 seriesId: series,
                 productType: type,
+                releaseDate: f.get('releaseDate'),
                 appearanceKey: f.get('appearanceKey'),
                 description: f.get('description'),
               })) as { id: string };
@@ -165,6 +166,14 @@ export default function ProductEditor({
             <small>自动生成的商品名</small>
             <strong>{name || '选择系列与类型后生成'}</strong>
           </div>
+          <label>
+            发售日期
+            <input
+              name="releaseDate"
+              type="date"
+              defaultValue={existing?.releaseDate?.slice(0, 10) ?? ''}
+            />
+          </label>
           <label>
             形象标识
             <input

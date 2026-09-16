@@ -12,6 +12,8 @@ export const posterFontAssets = {
   chineseHandwriting: '/fonts/LXGWWenKaiLite-Regular.woff2',
 } as const;
 
+export type PosterFontRole = keyof typeof posterFontAssets;
+
 export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAssets, string>>) {
   return [
     sources.sans

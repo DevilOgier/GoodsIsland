@@ -14,6 +14,7 @@ export const invitationTemplate: PosterTemplate = {
     numeric: fontRoles.serif,
     handwriting: fontRoles.serif,
   },
+  exportFonts: ['serif', 'sans'],
   palettes: [
     {
       id: 'champagne',

@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import type { Product, Snapshot } from './types';
 import ProductArt from './product-art';
+import { compareProductsByReleaseDate } from '@/lib/product-order';
 
 const PAGE_SIZE = 32;
 
@@ -55,7 +56,7 @@ export default function ProductPicker({
     const bySeries = new Map<string, Product[]>();
     const normalizedQuery = query.trim().toLocaleLowerCase('zh-CN');
 
-    for (const product of data.products) {
+    for (const product of [...data.products].sort(compareProductsByReleaseDate)) {
       if (product.status !== 'ACTIVE' || (allowed && !allowed.has(product.id))) continue;
       if (ip && product.series.character.ipId !== ip) continue;
       if (character && product.series.characterId !== character) continue;

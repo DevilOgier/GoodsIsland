@@ -74,6 +74,20 @@ export default function PosterEditor({
     };
   }, []);
 
+  useEffect(() => {
+    const activeTemplate = posterTemplateRegistry.get(template);
+    if (!activeTemplate) return;
+    const warmFonts = () => {
+      void posterFontCss(activeTemplate.exportFonts ?? ['sans']).catch(() => undefined);
+    };
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(warmFonts, { timeout: 1200 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = setTimeout(warmFonts, 250);
+    return () => clearTimeout(timeoutId);
+  }, [template]);
+
   const productMap = useMemo(
     () => new Map(data.products.map((product) => [product.id, product])),
     [data.products],
@@ -156,19 +170,32 @@ export default function PosterEditor({
   async function exportImage(format: 'png' | 'jpeg') {
     setBusy(true);
     setStatus('正在准备高清图片...');
+    const totalStart = performance.now();
+    const timings: Record<string, number> = {};
     try {
-      const [exportItems, embeddedFontCss] = await Promise.all([
-        mapWithConcurrency(items, 4, async (item) => {
-          if (!item.exportAssetId) return { ...item, image: undefined };
-          try {
-            return { ...item, image: await assetData(item.exportAssetId) };
-          } catch {
-            throw new Error(`“${item.name}”高清图加载失败，请稍后重试`);
-          }
-        }),
-        posterFontCss(),
-      ]);
+      const activeTemplate = posterTemplateRegistry.get(template);
+      const exportFonts = activeTemplate?.exportFonts ?? ['sans'];
+      const imageStart = performance.now();
+      const imagesPromise = mapWithConcurrency(items, 4, async (item) => {
+        if (!item.exportAssetId) return { ...item, image: undefined };
+        try {
+          return { ...item, image: await assetData(item.exportAssetId) };
+        } catch {
+          throw new Error(`“${item.name}”高清图加载失败，请稍后重试`);
+        }
+      }).then((value) => {
+        timings['export-images'] = performance.now() - imageStart;
+        return value;
+      });
+      const fontStart = performance.now();
+      const fontsPromise = posterFontCss(exportFonts).then((value) => {
+        timings['export-fonts'] = performance.now() - fontStart;
+        return value;
+      });
+      const [exportItems, embeddedFontCss] = await Promise.all([imagesPromise, fontsPromise]);
+
       setStatus('正在生成海报...');
+      const renderStart = performance.now();
       const svg = embedPosterFonts(
         renderPoster({
           title,
@@ -181,18 +208,19 @@ export default function PosterEditor({
         }),
         embeddedFontCss,
       );
-      await Promise.race([
-        document.fonts.ready,
-        new Promise<void>((resolve) => setTimeout(resolve, 1500)),
-      ]);
+      timings['render-svg'] = performance.now() - renderStart;
+
       const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
       try {
         const image = new Image();
+        const decodeStart = performance.now();
         await new Promise<void>((resolve, reject) => {
           image.onload = () => resolve();
           image.onerror = () => reject(new Error('海报渲染失败'));
           image.src = url;
         });
+        timings['decode-svg-image'] = performance.now() - decodeStart;
+
         const canvas = document.createElement('canvas');
         canvas.width = image.width;
         canvas.height = image.height;
@@ -201,6 +229,7 @@ export default function PosterEditor({
         context.fillStyle = '#ffffff';
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0);
+        const blobStart = performance.now();
         const blob = await new Promise<Blob>((resolve, reject) =>
           canvas.toBlob(
             (value) => (value ? resolve(value) : reject(new Error('图片导出失败'))),
@@ -208,6 +237,7 @@ export default function PosterEditor({
             0.95,
           ),
         );
+        timings['canvas-to-blob'] = performance.now() - blobStart;
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         link.download = `谷屿-${type === 'SALE' ? '出物' : '收物'}.${format === 'jpeg' ? 'jpg' : format}`;
@@ -220,6 +250,8 @@ export default function PosterEditor({
     } catch (error) {
       setStatus((error as Error).message);
     } finally {
+      timings.total = performance.now() - totalStart;
+      if (process.env.NODE_ENV !== 'production') console.info('[poster-export]', timings);
       setBusy(false);
     }
   }

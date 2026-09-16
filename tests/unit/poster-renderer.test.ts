@@ -98,3 +98,39 @@ test('价格和备注可隐藏，超长内容仍可稳定渲染', () => {
   assert.doesNotMatch(svg, /¥31\.00/);
   assert.doesNotMatch(svg, /(?:NaN|undefined)/);
 });
+
+
+test('Polaroid 两商品安全区容纳不同位数的数量标签', () => {
+  for (const quantities of [[1, 3], [14, 100]]) {
+    const posterItems = items(2).map((item, index) => ({
+      ...item,
+      quantity: quantities[index],
+      price: index === 0 ? '1234.56' : '68',
+    }));
+    const svg = renderPoster({
+      title: '数量标签安全区',
+      type: 'SALE',
+      ratio: '4:3',
+      template: 'polaroid',
+      version: 3,
+      items: posterItems,
+    });
+    const labels = [...svg.matchAll(/data-quantity-label="×(\d+)" data-quantity-left="([\d.]+)" data-quantity-right="([\d.]+)" data-quantity-width="([\d.]+)" data-price-right="([\d.]+)" data-safe-right="([\d.]+)" data-card-width="([\d.]+)"/g)];
+    assert.equal(labels.length, 2);
+    labels.forEach((match, index) => {
+      const left = Number(match[2]);
+      const right = Number(match[3]);
+      const width = Number(match[4]);
+      const priceRight = Number(match[5]);
+      const safeRight = Number(match[6]);
+      const cardWidth = Number(match[7]);
+      assert.equal(Number(match[1]), quantities[index]);
+      assert.ok(left >= 0);
+      assert.ok(right <= cardWidth - safeRight + 0.01);
+      assert.ok(priceRight < left);
+      assert.ok(Math.abs(right - left - width) < 0.01);
+    });
+    assert.ok(Number(labels[0][6]) > 0, '前卡应为后卡预留遮挡安全区');
+    assert.equal(Number(labels[1][6]), 0);
+  }
+});

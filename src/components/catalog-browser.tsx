@@ -4,6 +4,7 @@ import { Boxes, ChevronLeft, Layers3, PackageOpen, Shapes } from 'lucide-react';
 import CollectionGallery, { type GalleryItem } from './collection-gallery';
 import ProductArt from './product-art';
 import { SeriesCollage } from './product-picker';
+import { compareProductsByReleaseDate } from '@/lib/product-order';
 
 type Granularity = 'all' | 'type' | 'series';
 
@@ -25,10 +26,14 @@ export default function CatalogBrowser({
   const [granularity, setGranularity] = useState<Granularity>('type');
   const [selected, setSelected] = useState('');
   const [page, setPage] = useState(1);
+  const orderedItems = useMemo(
+    () => [...items].sort((left, right) => compareProductsByReleaseDate(left.product, right.product)),
+    [items],
+  );
   const groups = useMemo(() => {
     if (granularity === 'type') {
       const map = new Map<string, GalleryItem[]>();
-      for (const item of items) {
+      for (const item of orderedItems) {
         const key = item.product.productType;
         map.set(key, [...(map.get(key) ?? []), item]);
       }
@@ -43,7 +48,7 @@ export default function CatalogBrowser({
     }
     if (granularity === 'series') {
       const map = new Map<string, GalleryItem[]>();
-      for (const item of items) {
+      for (const item of orderedItems) {
         const key = item.product.seriesId;
         map.set(key, [...(map.get(key) ?? []), item]);
       }
@@ -57,9 +62,9 @@ export default function CatalogBrowser({
         .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'));
     }
     return [];
-  }, [granularity, items]);
+  }, [granularity, orderedItems]);
   const chosen = groups.find((group) => group.key === selected);
-  const visible = chosen?.items ?? items;
+  const visible = chosen?.items ?? orderedItems;
   const paged = visible.slice((page - 1) * 24, page * 24);
   const pages = Math.max(1, Math.ceil(visible.length / 24));
   const chooseGranularity = (next: Granularity) => {

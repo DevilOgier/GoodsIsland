@@ -24,11 +24,15 @@ export function escapeText(value: string) {
   );
 }
 
-function visualLength(value: string) {
+export function visualLength(value: string) {
   return [...value].reduce(
     (length, character) => length + (character.codePointAt(0)! > 255 ? 1 : 0.58),
     0,
   );
+}
+
+export function measureTextWidth(value: string, fontSize: number) {
+  return visualLength(value) * fontSize;
 }
 
 export function wrapText(value: string, maxUnits: number, maxLines = 2) {

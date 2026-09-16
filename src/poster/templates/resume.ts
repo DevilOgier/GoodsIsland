@@ -14,6 +14,7 @@ export const resumeTemplate: PosterTemplate = {
     numeric: fontRoles.mono,
     handwriting: fontRoles.sans,
   },
+  exportFonts: ['sans'],
   palettes: [
     {
       id: 'paper',
