@@ -17,9 +17,18 @@ previous=$(cat .current-image 2>/dev/null || true)
 export APP_IMAGE="$image"
 compose() { docker compose --env-file .env -f compose.yaml "$@"; }
 compose config --quiet
+# Keep images used by running containers and the recently pulled retry image, while
+# reclaiming older release layers before the next pull. Volumes are never pruned.
+docker image prune -af --filter 'until=24h' || true
+docker builder prune -af --filter 'until=24h' || true
+mkdir -p backups
+find backups -type f -name '*.tar.gz' -exec sh -c 'gzip -t "$1" 2>/dev/null || rm -f -- "$1"' sh {} \;
 compose pull web worker
 compose up -d --wait db
+backup=""
+image_backup_partial=""
 recover() {
+  [[ -z "$image_backup_partial" ]] || rm -f -- "$image_backup_partial"
   echo 'Deployment failed; database backup retained. Never auto-reverse migrations.'
   if [[ -n "$previous" ]]; then
     export APP_IMAGE="$previous"
@@ -30,12 +39,14 @@ recover() {
 trap recover ERR
 # Pause writers before backup so the backup covers all pre-deploy writes.
 compose stop web worker
-mkdir -p backups
 chmod 700 backups
 backup="backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ).dump"
 compose exec -T db pg_dump -U guzi -Fc guzi > "$backup"
 chmod 600 "$backup"
-compose run --rm --no-deps web sh -c 'if [ "$STORAGE_DRIVER" = filesystem ]; then tar -C "$STORAGE_LOCAL_DIR" -czf - .; fi' > "$backup.images.tar.gz"
+image_backup_partial="$backup.images.tar.gz.partial"
+compose run --rm --no-deps web sh -c 'if [ "$STORAGE_DRIVER" = filesystem ]; then tar -C "$STORAGE_LOCAL_DIR" -czf - .; fi' > "$image_backup_partial"
+mv -- "$image_backup_partial" "$backup.images.tar.gz"
+image_backup_partial=""
 chmod 600 "$backup.images.tar.gz"
 compose run --rm --no-deps web node node_modules/prisma/build/index.js migrate deploy
 compose run --rm --no-deps web node --import tsx prisma/seed.ts
