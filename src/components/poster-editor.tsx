@@ -3,9 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Palette, Plus, Save } from 'lucide-react';
 import type { Snapshot } from './types';
-import { renderPoster, templates } from '@/poster/renderer';
-import type { PosterItemData } from '@/poster/renderer';
-import { assetData, embedPosterFonts, mapWithConcurrency, posterFontCss } from '@/poster/assets';
+import { posterImageTargets, renderPoster, templates } from '@/poster/renderer';
+import type { PosterData, PosterItemData } from '@/poster/renderer';
+import {
+  assetData,
+  cachePosterExport,
+  embedPosterFonts,
+  getCachedPosterExport,
+  getExportImage,
+  mapWithConcurrency,
+  posterFontCss,
+} from '@/poster/assets';
 import { posterTemplateRegistry, posterTemplates } from '@/poster/registry';
 import type { PosterRenderOptions } from '@/poster/types';
 import { resolveOptions } from '@/poster/utils';
@@ -28,6 +36,38 @@ async function loadPreview(item: PosterItemData) {
   } catch {
     return item;
   }
+}
+
+const exportPixelRatio = 2;
+
+function posterExportKey(format: 'png' | 'jpeg', data: PosterData) {
+  return JSON.stringify({
+    format,
+    title: data.title,
+    type: data.type,
+    ratio: data.ratio,
+    template: data.template,
+    version: data.version,
+    config: data.config,
+    items: data.items.map(
+      ({ productId, name, quantity, price, note, exportAssetId }) => ({
+        productId,
+        name,
+        quantity,
+        price,
+        note,
+        exportAssetId,
+      }),
+    ),
+  });
+}
+
+function downloadPoster(blob: Blob, format: 'png' | 'jpeg', type: 'SALE' | 'WANTED') {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `谷屿-${type === 'SALE' ? '出物' : '收物'}.${format === 'jpeg' ? 'jpg' : format}`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
 export default function PosterEditor({
@@ -122,6 +162,57 @@ export default function PosterEditor({
     }
   }, [config, items, ratio, template, title, type, version]);
 
+  const exportData = useMemo<PosterData>(
+    () => ({
+      title,
+      type,
+      ratio,
+      template,
+      version,
+      config,
+      items: items.map((item) => ({ ...item, image: undefined })),
+    }),
+    [config, items, ratio, template, title, type, version],
+  );
+  const exportAssetPlan = useMemo(() => {
+    if (!exportData.items.length) return [];
+    const targets = posterImageTargets(exportData);
+    return exportData.items.flatMap((item) => {
+      const target = targets.get(item.productId);
+      return item.exportAssetId && target ? [{ item, target }] : [];
+    });
+  }, [exportData]);
+
+  useEffect(() => {
+    if (!exportAssetPlan.length) return;
+    let cancelled = false;
+    let idleId: number | undefined;
+    const prepare = () => {
+      if (cancelled) return;
+      void mapWithConcurrency(exportAssetPlan, 2, async ({ item, target }) => {
+        if (cancelled || !item.exportAssetId) return;
+        await getExportImage(
+          item.exportAssetId,
+          target.displayWidth,
+          target.displayHeight,
+          exportPixelRatio,
+        );
+      }).catch(() => undefined);
+    };
+    const timeoutId = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        idleId = window.requestIdleCallback(prepare, { timeout: 1500 });
+      } else {
+        prepare();
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      if (idleId !== undefined) window.cancelIdleCallback(idleId);
+    };
+  }, [exportAssetPlan]);
+
   useEffect(() => {
     let cancelled = false;
     if (!initial.items.some((item) => item.previewAssetId)) return;
@@ -169,27 +260,63 @@ export default function PosterEditor({
 
   async function exportImage(format: 'png' | 'jpeg') {
     setBusy(true);
-    setStatus('正在准备高清图片...');
+    setStatus('正在准备导出图片...');
     const totalStart = performance.now();
-    const timings: Record<string, number> = {};
+    const timings = {
+      prepareImages: 0,
+      imageDownload: 0,
+      imageResize: 0,
+      imageToDataURL: 0,
+      fontPrepare: 0,
+      svgGenerate: 0,
+      svgToImage: 0,
+      canvasDraw: 0,
+      canvasEncode: 0,
+      totalExport: 0,
+    };
+    let cacheHit = false;
     try {
+      const cacheKey = posterExportKey(format, exportData);
+      const cachedPoster = getCachedPosterExport(cacheKey);
+      if (cachedPoster) {
+        cacheHit = true;
+        downloadPoster(cachedPoster, format, type);
+        setStatus('海报已导出');
+        return;
+      }
+
       const activeTemplate = posterTemplateRegistry.get(template);
       const exportFonts = activeTemplate?.exportFonts ?? ['sans'];
+      const targets = posterImageTargets(exportData);
       const imageStart = performance.now();
-      const imagesPromise = mapWithConcurrency(items, 4, async (item) => {
-        if (!item.exportAssetId) return { ...item, image: undefined };
+      const imagesPromise = mapWithConcurrency(exportData.items, 2, async (item) => {
+        if (!item.exportAssetId) return { item: { ...item, image: undefined }, metrics: null };
+        const target = targets.get(item.productId);
+        if (!target) return { item: { ...item, image: undefined }, metrics: null };
         try {
-          return { ...item, image: await assetData(item.exportAssetId) };
+          const prepared = await getExportImage(
+            item.exportAssetId,
+            target.displayWidth,
+            target.displayHeight,
+            exportPixelRatio,
+          );
+          return { item: { ...item, image: prepared.dataUrl }, metrics: prepared.metrics };
         } catch {
           throw new Error(`“${item.name}”高清图加载失败，请稍后重试`);
         }
-      }).then((value) => {
-        timings['export-images'] = performance.now() - imageStart;
-        return value;
+      }).then((prepared) => {
+        timings.prepareImages = performance.now() - imageStart;
+        for (const result of prepared) {
+          if (!result.metrics) continue;
+          timings.imageDownload += result.metrics.imageDownload;
+          timings.imageResize += result.metrics.imageResize;
+          timings.imageToDataURL += result.metrics.imageToDataURL;
+        }
+        return prepared.map((result) => result.item);
       });
       const fontStart = performance.now();
       const fontsPromise = posterFontCss(exportFonts).then((value) => {
-        timings['export-fonts'] = performance.now() - fontStart;
+        timings.fontPrepare = performance.now() - fontStart;
         return value;
       });
       const [exportItems, embeddedFontCss] = await Promise.all([imagesPromise, fontsPromise]);
@@ -198,17 +325,12 @@ export default function PosterEditor({
       const renderStart = performance.now();
       const svg = embedPosterFonts(
         renderPoster({
-          title,
-          type,
-          ratio,
-          template,
+          ...exportData,
           items: exportItems,
-          version,
-          config,
         }),
         embeddedFontCss,
       );
-      timings['render-svg'] = performance.now() - renderStart;
+      timings.svgGenerate = performance.now() - renderStart;
 
       const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }));
       try {
@@ -219,8 +341,9 @@ export default function PosterEditor({
           image.onerror = () => reject(new Error('海报渲染失败'));
           image.src = url;
         });
-        timings['decode-svg-image'] = performance.now() - decodeStart;
+        timings.svgToImage = performance.now() - decodeStart;
 
+        const drawStart = performance.now();
         const canvas = document.createElement('canvas');
         canvas.width = image.width;
         canvas.height = image.height;
@@ -229,6 +352,7 @@ export default function PosterEditor({
         context.fillStyle = '#ffffff';
         context.fillRect(0, 0, canvas.width, canvas.height);
         context.drawImage(image, 0, 0);
+        timings.canvasDraw = performance.now() - drawStart;
         const blobStart = performance.now();
         const blob = await new Promise<Blob>((resolve, reject) =>
           canvas.toBlob(
@@ -237,12 +361,11 @@ export default function PosterEditor({
             0.95,
           ),
         );
-        timings['canvas-to-blob'] = performance.now() - blobStart;
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `谷屿-${type === 'SALE' ? '出物' : '收物'}.${format === 'jpeg' ? 'jpg' : format}`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        timings.canvasEncode = performance.now() - blobStart;
+        canvas.width = 1;
+        canvas.height = 1;
+        cachePosterExport(cacheKey, blob);
+        downloadPoster(blob, format, type);
         setStatus('海报已导出');
       } finally {
         URL.revokeObjectURL(url);
@@ -250,8 +373,10 @@ export default function PosterEditor({
     } catch (error) {
       setStatus((error as Error).message);
     } finally {
-      timings.total = performance.now() - totalStart;
-      if (process.env.NODE_ENV !== 'production') console.info('[poster-export]', timings);
+      timings.totalExport = performance.now() - totalStart;
+      if (process.env.NODE_ENV !== 'production') {
+        console.info('[poster-export]', { ...timings, cacheHit });
+      }
       setBusy(false);
     }
   }

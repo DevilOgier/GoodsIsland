@@ -113,7 +113,7 @@ export function image(
 ) {
   if (item.image && /^data:image\/(png|jpeg|webp|gif);base64,/.test(item.image)) {
     const clip = options.clipId ? ` clip-path="url(#${options.clipId})"` : '';
-    return `<image href="${item.image}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid ${options.fit ?? 'meet'}"${clip}/>`;
+    return `<image data-poster-product-id="${escapeText(encodeURIComponent(item.productId))}" href="${item.image}" x="${x}" y="${y}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid ${options.fit ?? 'meet'}"${clip}/>`;
   }
   const radius = options.radius ?? 0;
   return (

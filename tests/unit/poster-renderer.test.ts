@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderPoster } from '../../src/poster/renderer';
+import { posterImageTargets, renderPoster } from '../../src/poster/renderer';
 import type { PosterData, PosterRenderOptions } from '../../src/poster/types';
 
 const transparentPixel =
@@ -132,5 +132,28 @@ test('Polaroid 两商品安全区容纳不同位数的数量标签', () => {
     });
     assert.ok(Number(labels[0][6]) > 0, '前卡应为后卡预留遮挡安全区');
     assert.equal(Number(labels[1][6]), 0);
+  }
+});
+
+test('导出素材尺寸来自各模板真实图片占位', () => {
+  for (const template of ['polaroid', 'invitation', 'gingham', 'resume']) {
+    for (const count of [1, 4, 8]) {
+      const posterItems = items(count);
+      const targets = posterImageTargets({
+        title: '尺寸探针',
+        type: 'SALE',
+        ratio: '1:1',
+        template,
+        version: 3,
+        items: posterItems,
+      });
+      assert.equal(targets.size, count);
+      for (const item of posterItems) {
+        const target = targets.get(item.productId);
+        assert.ok(target);
+        assert.ok(target.displayWidth > 0 && target.displayWidth <= 1080);
+        assert.ok(target.displayHeight > 0 && target.displayHeight <= 1080);
+      }
+    }
   }
 });
