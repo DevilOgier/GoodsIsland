@@ -7,6 +7,14 @@ image="${1:?Expected immutable image reference}"
 [[ "$image" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[a-f0-9]{64}$ ]] || { echo 'Invalid image'; exit 1; }
 [[ -f .env ]] || { echo 'Configure /opt/goods-island/.env first'; exit 1; }
 chmod 600 .env
+# Reclaim space before registry login creates temporary credentials. A failed
+# backup can otherwise fill the disk so completely that mktemp cannot run.
+if [[ -d backups ]]; then
+  find backups -type f -name '*.tar.gz' -exec sh -c 'gzip -t "$1" 2>/dev/null || rm -f -- "$1"' sh {} \;
+fi
+docker image prune -af --filter 'until=24h' || true
+docker builder prune -af --filter 'until=24h' || true
+mkdir -p backups
 if [[ -n "${2:-}" ]]; then
   export DOCKER_CONFIG
   DOCKER_CONFIG=$(mktemp -d /opt/goods-island/.registry.XXXXXX)
@@ -17,12 +25,6 @@ previous=$(cat .current-image 2>/dev/null || true)
 export APP_IMAGE="$image"
 compose() { docker compose --env-file .env -f compose.yaml "$@"; }
 compose config --quiet
-# Keep images used by running containers and the recently pulled retry image, while
-# reclaiming older release layers before the next pull. Volumes are never pruned.
-docker image prune -af --filter 'until=24h' || true
-docker builder prune -af --filter 'until=24h' || true
-mkdir -p backups
-find backups -type f -name '*.tar.gz' -exec sh -c 'gzip -t "$1" 2>/dev/null || rm -f -- "$1"' sh {} \;
 compose pull web worker
 compose up -d --wait db
 backup=""
