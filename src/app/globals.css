@@ -1160,6 +1160,58 @@ input::placeholder {
   text-align: center;
   font-size: 10px;
 }
+.saved-accounts {
+  display: grid;
+  gap: 9px;
+}
+.saved-accounts > small:first-child {
+  text-align: left;
+  color: var(--muted);
+  font-weight: 700;
+}
+.saved-accounts > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  min-height: 58px;
+  padding: 9px 12px;
+  text-align: left;
+  background: #f7f7f1;
+  border: 1px solid #e4e6dc;
+  border-radius: 13px;
+}
+.saved-accounts > button > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+}
+.saved-accounts > button small {
+  text-align: left;
+  color: var(--muted);
+}
+.saved-account-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: #fff;
+  background: var(--color-primary);
+  border-radius: 50%;
+}
+.saved-accounts-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.saved-accounts-divider::before,
+.saved-accounts-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
 .poster-workspace {
   display: grid;
   grid-template-columns: 330px minmax(0, 1fr);
@@ -2683,7 +2735,7 @@ body {
   max-width: 920px;
 }
 .account-card,
-.account-create {
+.account-switcher {
   padding: 24px;
   background: white;
   border: 1px solid var(--line);
@@ -2696,11 +2748,11 @@ body {
   gap: 18px;
 }
 .account-card h1,
-.account-create h2 {
+.account-switcher h2 {
   margin: 4px 0;
 }
 .account-card p,
-.account-create p {
+.account-switcher p {
   margin: 4px 0 12px;
   color: var(--muted);
 }
@@ -2724,25 +2776,62 @@ body {
   border: 1px solid #e5caca;
   border-radius: 12px;
 }
-.account-create header {
+.account-switcher header {
   display: flex;
   align-items: flex-start;
   gap: 12px;
 }
-.account-create form {
+.account-switch-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
   margin-top: 18px;
 }
-.account-create label {
+.account-switch-list > button {
   display: grid;
-  gap: 7px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  text-align: left;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
 }
-.account-create .success,
-.account-create .error,
-.account-create button {
-  grid-column: 1 / -1;
+.account-switch-list > button > span:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+.account-switch-list small {
+  color: var(--muted);
+}
+.account-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 16px;
+}
+.account-session-note {
+  font-size: 11px;
+}
+.catalog-date {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+.catalog-date.is-missing {
+  color: #a16e3d;
+}
+.product-release-date {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  padding: 9px 12px;
+  background: var(--color-surface-soft);
+  border-radius: 10px;
+}
+.product-release-date small {
+  color: var(--muted);
 }
 @media (max-width: 900px) {
   .catalog-series-grid {
@@ -2778,10 +2867,7 @@ body {
     grid-column: 1 / -1;
     justify-content: center;
   }
-  .account-create {
+  .account-switcher {
     padding: 18px;
-  }
-  .account-create form {
-    grid-template-columns: 1fr;
   }
 }

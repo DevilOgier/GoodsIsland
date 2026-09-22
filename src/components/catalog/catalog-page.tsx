@@ -10,6 +10,8 @@ type CatalogPageProps = {
   quantityFor: (productId: string) => number;
   onPurchase: (productId: string) => void;
   onAddProduct: () => void;
+  canEdit: boolean;
+  onEditProduct: (productId: string) => void;
 };
 
 export default function CatalogPage({
@@ -17,6 +19,8 @@ export default function CatalogPage({
   quantityFor,
   onPurchase,
   onAddProduct,
+  canEdit,
+  onEditProduct,
 }: CatalogPageProps) {
   return (
     <>
@@ -38,9 +42,23 @@ export default function CatalogPage({
               </strong>
             ),
             actions: (
-              <button className="small-btn" onClick={() => onPurchase(product.id)}>
-                记录买入
-              </button>
+              <>
+                <button className="small-btn" onClick={() => onPurchase(product.id)}>
+                  记录买入
+                </button>
+                {canEdit && (
+                  <button className="small-btn" onClick={() => onEditProduct(product.id)}>
+                    {product.releaseDate ? '编辑图鉴' : '补录时间'}
+                  </button>
+                )}
+              </>
+            ),
+            details: (
+              <small className={product.releaseDate ? 'catalog-date' : 'catalog-date is-missing'}>
+                {product.releaseDate
+                  ? `发售于 ${product.releaseDate.slice(0, 10)}`
+                  : '发售时间待补录'}
+              </small>
             ),
             quantity: quantityFor(product.id),
           }))}

@@ -328,6 +328,7 @@ async function dispatch(
     }
     if (op === 'catalog.product') {
       const d = productSchema.parse(raw);
+      ensure(d.releaseDate, '请填写出现 / 发售日期');
       const { tagIds, ...data } = d;
       return tx.product.create({
         data: {
@@ -339,6 +340,7 @@ async function dispatch(
     }
     if (op === 'catalog.product-update') {
       const d = productSchema.extend({ id: z.uuid() }).parse(raw);
+      ensure(d.releaseDate, '请填写出现 / 发售日期');
       const { id, tagIds, ...rest } = d;
       return tx.product.update({
         where: { id },

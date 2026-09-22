@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { currentUser } from '@/infrastructure/auth';
+import { currentUser, rememberedAccounts } from '@/infrastructure/auth';
 import Cabinet from '@/components/cabinet';
 export const dynamic = 'force-dynamic';
 export default async function Page({
@@ -14,10 +14,12 @@ export default async function Page({
   const user = await currentUser();
   if (!user) redirect('/login');
   if (route.path?.[0] === 'admin' && user.role !== 'ADMIN') redirect('/');
+  const accounts = await rememberedAccounts();
   return (
     <Cabinet
       key={(route.path ?? []).join('/') + JSON.stringify(query)}
       user={{ id: user.id, name: user.name, email: user.email, role: user.role }}
+      accounts={accounts}
     />
   );
 }

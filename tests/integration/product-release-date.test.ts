@@ -6,7 +6,7 @@ import { command } from '../../src/domain/commands';
 import { snapshot } from '../../src/domain/query-service';
 import { createCatalogFixture, deleteCatalogFixture } from './catalog-fixture';
 
-test('商品发布日期支持创建、修改、清空、校验和统一排序', async () => {
+test('商品发布日期必填、支持补录、校验并统一倒序排列', async () => {
   const user = await db.user.create({
     data: {
       email: randomUUID() + '@example.invalid',
@@ -26,10 +26,16 @@ test('商品发布日期支持创建、修改、清空、校验和统一排序',
     tagIds: [],
   };
   try {
-    const withoutDate = await command(user, 'catalog.product', base, randomUUID()) as {
-      id: string;
-      releaseDate: string | null;
-    };
+    await assert.rejects(command(user, 'catalog.product', base, randomUUID()), /发售日期/);
+
+    const withoutDate = await db.product.create({
+      data: {
+        seriesId: fixture.series.id,
+        productType: productType.key,
+        name: fixture.character.name + ' · ' + fixture.series.name + ' · 旧商品',
+        appearanceKey: 'legacy-without-date',
+      },
+    });
     productIds.push(withoutDate.id);
     assert.equal(withoutDate.releaseDate, null);
 
@@ -58,13 +64,23 @@ test('商品发布日期支持创建、修改、清空、校验和统一排序',
     ) as { releaseDate: string };
     assert.equal(new Date(updated.releaseDate).toISOString(), '2025-04-09T00:00:00.000Z');
 
-    const cleared = await command(
+    const filled = await command(
       user,
       'catalog.product-update',
-      { ...base, appearanceKey: 'older', id: older.id, releaseDate: '' },
+      { ...base, appearanceKey: 'legacy-without-date', id: withoutDate.id, releaseDate: '2024-01-02' },
       randomUUID(),
-    ) as { releaseDate: string | null };
-    assert.equal(cleared.releaseDate, null);
+    ) as { releaseDate: string };
+    assert.equal(new Date(filled.releaseDate).toISOString(), '2024-01-02T00:00:00.000Z');
+
+    await assert.rejects(
+      command(
+        user,
+        'catalog.product-update',
+        { ...base, appearanceKey: 'older', id: older.id, releaseDate: '' },
+        randomUUID(),
+      ),
+      /发售日期/,
+    );
 
     await assert.rejects(
       command(

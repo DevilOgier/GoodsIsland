@@ -31,7 +31,7 @@ test('自定义类型和服务端自动命名', async () => {
     const p = (await command(
       user,
       'catalog.product',
-      { seriesId: series.id, productType: t.key, name: '伪造商品名' },
+      { seriesId: series.id, productType: t.key, name: '伪造商品名', releaseDate: '2026-09-22' },
       randomUUID(),
     )) as { id: string; name: string };
     productId = p.id;
@@ -39,7 +39,13 @@ test('自定义类型和服务端自动命名', async () => {
     const edited = (await command(
       user,
       'catalog.product-update',
-      { id: p.id, seriesId: series.id, productType: t.key, name: '仍然不能覆盖' },
+      {
+        id: p.id,
+        seriesId: series.id,
+        productType: t.key,
+        name: '仍然不能覆盖',
+        releaseDate: '2026-09-22',
+      },
       randomUUID(),
     )) as { name: string };
     assert.equal(edited.name, p.name);
@@ -47,7 +53,7 @@ test('自定义类型和服务端自动命名', async () => {
       command(
         user,
         'catalog.product',
-        { seriesId: series.id, productType: 'NOT_A_TYPE' },
+        { seriesId: series.id, productType: 'NOT_A_TYPE', releaseDate: '2026-09-22' },
         randomUUID(),
       ),
       /有效系列与类型/,

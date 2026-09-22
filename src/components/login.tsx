@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Flower2, ArrowUpRight } from 'lucide-react';
-export default function Login({ setup }: { setup: boolean }) {
+import { Flower2, ArrowUpRight, UserRound } from 'lucide-react';
+import type { RememberedAccount } from '@/infrastructure/auth';
+export default function Login({ setup, accounts }: { setup: boolean; accounts: RememberedAccount[] }) {
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [error, setError] = useState('');
@@ -59,6 +60,44 @@ export default function Login({ setup }: { setup: boolean }) {
         <div className="brand">
           <Flower2 /> 谷屿 <small>GUYU</small>
         </div>
+        {!setup && accounts.length > 0 && mode === 'login' && (
+          <section className="saved-accounts" aria-label="已登录账号">
+            <small>快速切换</small>
+            {accounts.map((account) => (
+              <button
+                type="button"
+                key={account.id}
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError('');
+                  try {
+                    const response = await fetch('/api/auth', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'switch', userId: account.id }),
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw Error(result.error);
+                    router.replace('/');
+                    router.refresh();
+                  } catch (exception) {
+                    setError((exception as Error).message);
+                    setBusy(false);
+                  }
+                }}
+              >
+                <span className="saved-account-avatar">{account.name.slice(0, 1)}</span>
+                <span>
+                  <strong>{account.name}</strong>
+                  <small>{account.email}</small>
+                </span>
+                <UserRound size={17} />
+              </button>
+            ))}
+            <span className="saved-accounts-divider">或使用邮箱登录</span>
+          </section>
+        )}
         {!setup && (
           <div className="auth-switch" role="tablist" aria-label="账号入口">
             <button

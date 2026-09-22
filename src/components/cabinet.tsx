@@ -28,10 +28,13 @@ import ListingsPage from './listings/listings-page';
 import GroupPage from './groups/group-page';
 import GroupDetail from './groups/group-detail';
 import AdminPage, { type AdminTab } from './admin/admin-page';
+import type { RememberedAccount } from '@/infrastructure/auth';
 export default function Cabinet({
   user,
+  accounts,
 }: {
   user: { id: string; name: string; email: string; role: string };
+  accounts: RememberedAccount[];
 }) {
   const router = useRouter();
   const path = usePathname();
@@ -124,16 +127,24 @@ export default function Cabinet({
   const notify = (message: string, tone: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, tone });
   };
-  const logout = async () => {
-    await fetch('/api/auth', {
+  const authTransition = async (action: 'leave' | 'logout' | 'switch', userId?: string) => {
+    const response = await fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'logout' }),
+      body: JSON.stringify({ action, userId }),
     });
+    const result = await response.json();
+    if (!response.ok) {
+      notify(result.error ?? '账号操作失败', 'error');
+      return;
+    }
     snapshotCache.clear();
-    router.replace('/login');
+    router.replace(action === 'switch' ? '/' : '/login');
     router.refresh();
   };
+  const leave = () => authTransition('leave');
+  const logout = () => authTransition('logout');
+  const switchAccount = (userId: string) => authTransition('switch', userId);
   const save = async (
     op: string,
     payload: Record<string, unknown>,
@@ -382,6 +393,16 @@ export default function Cabinet({
                   </span>
                 ))}
               </div>
+              <p className="product-release-date">
+                <small>出现 / 发售时间</small>
+                <strong>
+                  {selected.releaseDate
+                    ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'long', timeZone: 'UTC' }).format(
+                        new Date(selected.releaseDate),
+                      )
+                    : '尚未补录'}
+                </strong>
+              </p>
               <div className="detail-stats">
                 <div>
                   <small>在手数量</small>
@@ -419,6 +440,11 @@ export default function Cabinet({
                 </button>
                 {actionButton('wanted', '我想收', undefined, selected.id)}
                 {actionButton('listing', '准备出物', undefined, selected.id)}
+                {user.role === 'ADMIN' && (
+                  <button onClick={() => setDialog({ type: 'productEdit', id: selected.id })}>
+                    {selected.releaseDate ? '编辑图鉴' : '补录发售日期'}
+                  </button>
+                )}
               </div>
             </div>
           </section>
@@ -467,6 +493,8 @@ export default function Cabinet({
           quantityFor={(id) => invFor(id)?.currentQuantity ?? 0}
           onPurchase={(productId) => setDialog({ type: 'purchase', productId })}
           onAddProduct={() => setDialog({ type: 'product' })}
+          canEdit={user.role === 'ADMIN'}
+          onEditProduct={(id) => setDialog({ type: 'productEdit', id })}
         />
       );
     } else if (path === '/inventory') {
@@ -598,7 +626,13 @@ export default function Cabinet({
     else if (path === '/me')
       content = (
         <>
-          <AccountPanel user={user} onLogout={logout} />
+          <AccountPanel
+            user={user}
+            accounts={accounts}
+            onSwitch={switchAccount}
+            onAddAccount={leave}
+            onLogout={logout}
+          />
           <MoreMenu role={user.role} />
         </>
       );
@@ -632,7 +666,7 @@ export default function Cabinet({
         section={section}
         user={user}
         data={data}
-        onLogout={logout}
+        onLogout={leave}
         onQuickAction={openQuickAction}
       >
         <div className="app-content">

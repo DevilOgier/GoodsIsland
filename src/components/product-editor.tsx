@@ -167,10 +167,11 @@ export default function ProductEditor({
             <strong>{name || '选择系列与类型后生成'}</strong>
           </div>
           <label>
-            发售日期
+            出现 / 发售日期
             <input
               name="releaseDate"
               type="date"
+              required
               defaultValue={existing?.releaseDate?.slice(0, 10) ?? ''}
             />
           </label>

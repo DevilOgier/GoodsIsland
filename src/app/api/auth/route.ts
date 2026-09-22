@@ -1,10 +1,11 @@
-import { cookies } from 'next/headers';
 import { db } from '@/infrastructure/db';
 import {
   createSession,
+  forgetSession,
   hashPassword,
-  hashToken,
+  leaveActiveSession,
   requireUser,
+  switchSession,
   verifyPassword,
 } from '@/infrastructure/auth';
 import { ensure } from '@/domain/errors';
@@ -16,16 +17,25 @@ export async function POST(request: Request) {
     originGuard(request);
     const d = z
       .object({
-        action: z.enum(['login', 'setup', 'logout', 'register', 'signup']),
+        action: z.enum(['login', 'setup', 'logout', 'leave', 'switch', 'register', 'signup']),
         email: z.email().optional(),
         password: z.string().min(10).max(128).optional(),
         name: z.string().min(1).max(50).optional(),
+        userId: z.uuid().optional(),
       })
       .parse(await request.json());
+    if (d.action === 'switch') {
+      ensure(d.userId, '请选择要切换的账号');
+      const user = await switchSession(d.userId);
+      return Response.json({ id: user.id, name: user.name });
+    }
+    if (d.action === 'leave') {
+      await leaveActiveSession();
+      return Response.json({ ok: true });
+    }
     if (d.action === 'logout') {
-      const token = (await cookies()).get('guzi-session')?.value;
-      if (token) await db.session.deleteMany({ where: { tokenHash: hashToken(token) } });
-      (await cookies()).delete('guzi-session');
+      const user = await requireUser();
+      await forgetSession(user.id);
       return Response.json({ ok: true });
     }
     ensure(d.email && d.password, '请填写邮箱和至少10位密码');
