@@ -49,16 +49,14 @@ function posterExportKey(format: 'png' | 'jpeg', data: PosterData) {
     template: data.template,
     version: data.version,
     config: data.config,
-    items: data.items.map(
-      ({ productId, name, quantity, price, note, exportAssetId }) => ({
-        productId,
-        name,
-        quantity,
-        price,
-        note,
-        exportAssetId,
-      }),
-    ),
+    items: data.items.map(({ productId, name, quantity, price, note, exportAssetId }) => ({
+      productId,
+      name,
+      quantity,
+      price,
+      note,
+      exportAssetId,
+    })),
   });
 }
 
@@ -175,13 +173,13 @@ export default function PosterEditor({
     [config, items, ratio, template, title, type, version],
   );
   const exportAssetPlan = useMemo(() => {
-    if (!exportData.items.length) return [];
+    if (!exportData.items.length || rendered.error) return [];
     const targets = posterImageTargets(exportData);
     return exportData.items.flatMap((item) => {
       const target = targets.get(item.productId);
       return item.exportAssetId && target ? [{ item, target }] : [];
     });
-  }, [exportData]);
+  }, [exportData, rendered.error]);
 
   useEffect(() => {
     if (!exportAssetPlan.length) return;

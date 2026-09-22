@@ -39,7 +39,7 @@ export default function GroupDetail({
           团长 · {group.groupOwner} / {statusNames[group.status]}
         </p>
         <p className="group-sync-note">
-          确认付款后会记入收藏柜；派发时记录邮费并进入“在路上”，确认到货后才增加在手库存。
+          录入即记录已付款支出，并进入收藏柜“等待到货”；派发时补记邮费，确认到货后才增加在手库存。
         </p>
         <div className="button-row">
           {group.status === 'OPEN' && (
@@ -123,18 +123,21 @@ export default function GroupDetail({
               {item.purchase &&
                 item.paymentStatus === 'PAID' &&
                 item.dispatchStatus !== 'DISPATCHED' &&
-                !['ARRIVED', 'CANCELLED'].includes(item.purchase.arrivalStatus) &&
+                item.purchase.arrivalStatus === 'PENDING' &&
                 !['COMPLETED', 'CANCELLED'].includes(group.status) && (
                   <button className="small-btn" onClick={() => onDispatch(item.id)}>
                     确认已派发
                   </button>
                 )}
-              {item.dispatchStatus === 'DISPATCHED' && <span className="pill">已派发</span>}
+              {(item.dispatchStatus === 'DISPATCHED' ||
+                item.purchase?.arrivalStatus === 'ARRIVED' ||
+                item.purchase?.arrivalStatus === 'SHIPPED') && <span className="pill">已派发</span>}
             </div>
             {item.purchase && (
               <>
                 <span className="pill">{statusNames[item.purchase.arrivalStatus]}</span>
-                {item.dispatchStatus === 'DISPATCHED' &&
+                {(item.dispatchStatus === 'DISPATCHED' ||
+                  item.purchase.arrivalStatus === 'SHIPPED') &&
                   !['ARRIVED', 'CANCELLED'].includes(item.purchase.arrivalStatus) && (
                     <button
                       className="small-btn"

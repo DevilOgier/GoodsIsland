@@ -49,6 +49,11 @@ test('拼团购入：原子建团、已有团、已有团项、权限、回滚�
         .paymentStatus,
       'PAID',
     );
+    assert.equal(
+      (await db.groupBuyItem.findUniqueOrThrow({ where: { id: first.groupBuyItemId } }))
+        .dispatchStatus,
+      'DISPATCHED',
+    );
     const second = await send({ ...base, groupId: first.groupBuyId, arrivalStatus: 'PENDING' });
     assert.equal(second.groupBuyId, first.groupBuyId);
     assert.notEqual(second.groupBuyItemId, first.groupBuyItemId);
@@ -65,8 +70,11 @@ test('拼团购入：原子建团、已有团、已有团项、权限、回滚�
     )) as { id: string };
     assert.equal(
       (await db.groupBuyItem.findUniqueOrThrow({ where: { id: item.id } })).paymentStatus,
-      'UNPAID',
+      'PAID',
     );
+    const recorded = await db.purchase.findUniqueOrThrow({ where: { groupBuyItemId: item.id } });
+    assert.equal(recorded.actualCost.toFixed(2), '24.00');
+    assert.equal(recorded.arrivalStatus, 'PENDING');
     const linked = (await command(user, 'group.pay', { id: item.id }, randomUUID())) as {
       id: string;
     };

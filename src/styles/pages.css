@@ -521,6 +521,9 @@
   border-radius: 4px;
 }
 .poster-format-controls {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--color-line);
   display: grid;
 }
 .template-options.template-options {

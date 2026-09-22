@@ -354,7 +354,7 @@ export default function Cabinet({
           item.paymentStatus === 'PAID' &&
           item.dispatchStatus === 'NOT_DISPATCHED' &&
           !!item.purchase &&
-          item.purchase.arrivalStatus !== 'CANCELLED'
+          item.purchase.arrivalStatus === 'PENDING'
         );
       return false;
     });
@@ -397,9 +397,10 @@ export default function Cabinet({
                 <small>出现 / 发售时间</small>
                 <strong>
                   {selected.releaseDate
-                    ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'long', timeZone: 'UTC' }).format(
-                        new Date(selected.releaseDate),
-                      )
+                    ? new Intl.DateTimeFormat('zh-CN', {
+                        dateStyle: 'long',
+                        timeZone: 'UTC',
+                      }).format(new Date(selected.releaseDate))
                     : '尚未补录'}
                 </strong>
               </p>

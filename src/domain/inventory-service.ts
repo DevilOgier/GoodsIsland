@@ -14,6 +14,11 @@ export async function inventoryFor(tx: Tx, userId: string, productId: string) {
 export async function arrive(tx: Tx, userId: string, id: string) {
   const p = await tx.purchase.findFirst({ where: { id, userId } });
   ensure(p, '购买记录不存在', 404);
+  if (p.groupBuyItemId && p.arrivalStatus !== 'CANCELLED')
+    await tx.groupBuyItem.update({
+      where: { id: p.groupBuyItemId },
+      data: { dispatchStatus: 'DISPATCHED' },
+    });
   if (p.arrivalStatus === 'ARRIVED') return p;
   ensure(p.arrivalStatus !== 'CANCELLED', '已取消的购买不能到货', 409);
   const inv = await inventoryFor(tx, userId, p.productId);
@@ -125,7 +130,10 @@ export async function buy(tx: Tx, userId: string, raw: unknown) {
   if (p.groupBuyItemId)
     await tx.groupBuyItem.update({
       where: { id: p.groupBuyItemId },
-      data: { paymentStatus: 'PAID' },
+      data: {
+        paymentStatus: 'PAID',
+        dispatchStatus: d.arrivalStatus === 'PENDING' ? 'NOT_DISPATCHED' : 'DISPATCHED',
+      },
     });
   return d.arrivalStatus === 'ARRIVED' ? arrive(tx, userId, p.id) : p;
 }

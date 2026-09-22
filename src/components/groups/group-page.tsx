@@ -62,7 +62,9 @@ export default function GroupPage({
                 (item) =>
                   item.paymentStatus === 'PAID' &&
                   item.dispatchStatus === 'NOT_DISPATCHED' &&
-                  item.purchase?.arrivalStatus !== 'CANCELLED' &&
+                  !['ARRIVED', 'SHIPPED', 'CANCELLED'].includes(
+                    item.purchase?.arrivalStatus ?? '',
+                  ) &&
                   Boolean(item.purchase),
               ).length
             }
@@ -145,7 +147,14 @@ export default function GroupPage({
                 </span>
                 <span>
                   <strong>
-                    {group.items.filter((item) => item.dispatchStatus !== 'DISPATCHED').length}
+                    {
+                      group.items.filter(
+                        (item) =>
+                          item.paymentStatus === 'PAID' &&
+                          item.purchase?.arrivalStatus === 'PENDING' &&
+                          item.dispatchStatus !== 'DISPATCHED',
+                      ).length
+                    }
                   </strong>
                   项待排发
                 </span>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { X } from 'lucide-react';
 import type { PosterItemData } from '@/poster/renderer';
 
@@ -10,6 +11,7 @@ export function PosterItemList({
   items: PosterItemData[];
   onChange: (items: PosterItemData[]) => void;
 }) {
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   return items.map((item, index) => (
     <div className="poster-item" key={item.productId}>
       <div className="poster-item__heading">
@@ -33,14 +35,25 @@ export function PosterItemList({
             aria-label={`海报数量${index}`}
             type="number"
             min="1"
-            value={item.quantity}
-            onChange={(event) =>
+            value={drafts[item.productId] ?? item.quantity}
+            onBlur={() =>
+              setDrafts((current) => {
+                const next = { ...current };
+                delete next[item.productId];
+                return next;
+              })
+            }
+            onChange={(event) => {
+              const raw = event.target.value;
+              setDrafts((current) => ({ ...current, [item.productId]: raw }));
+              const quantity = Number(raw);
+              if (!Number.isSafeInteger(quantity) || quantity < 1) return;
               onChange(
                 items.map((value, position) =>
-                  position === index ? { ...value, quantity: Number(event.target.value) } : value,
+                  position === index ? { ...value, quantity } : value,
                 ),
-              )
-            }
+              );
+            }}
           />
         </label>
         <label>

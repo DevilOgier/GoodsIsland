@@ -45,7 +45,8 @@ export default function DashboardPage({
     .flatMap((group) => group.items)
     .filter(
       (item) =>
-        item.dispatchStatus === 'NOT_DISPATCHED' && item.purchase?.arrivalStatus !== 'CANCELLED',
+        item.dispatchStatus === 'NOT_DISPATCHED' &&
+        !['ARRIVED', 'SHIPPED', 'CANCELLED'].includes(item.purchase?.arrivalStatus ?? ''),
     ).length;
   const ownedProducts = data.products
     .filter((product) => (index.inventoryByProductId.get(product.id)?.currentQuantity ?? 0) > 0)

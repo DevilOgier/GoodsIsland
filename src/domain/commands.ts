@@ -203,7 +203,17 @@ async function dispatch(
       await tx.groupBuy.findFirst({ where: { id: d.groupId, userId, status: 'OPEN' } }),
       '拼团不存在或已截团',
     );
-    return tx.groupBuyItem.create({ data: d });
+    const item = await tx.groupBuyItem.create({ data: d });
+    await buy(tx, userId, {
+      productId: d.productId,
+      quantity: d.quantity,
+      unitPrice: d.unitPrice,
+      purchaseChannel: '拼团',
+      purchaseDate: new Date().toISOString().slice(0, 10),
+      arrivalStatus: 'PENDING',
+      groupBuyItemId: item.id,
+    });
+    return tx.groupBuyItem.findUniqueOrThrow({ where: { id: item.id } });
   }
   if (op === 'group.pay') {
     const { id } = z.object({ id: z.uuid() }).parse(raw);
@@ -294,9 +304,7 @@ async function dispatch(
       ensure(
         g.status === 'CLOSED' &&
           g.items.length > 0 &&
-          g.items.every(
-            (i) => i.purchase?.arrivalStatus === 'ARRIVED' && i.dispatchStatus === 'DISPATCHED',
-          ),
+          g.items.every((i) => i.purchase?.arrivalStatus === 'ARRIVED'),
         '需截团且全部到货、排发后完成',
       );
     if (d.status === 'CANCELLED') {
