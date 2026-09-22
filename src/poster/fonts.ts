@@ -10,12 +10,16 @@ export const posterFontAssets = {
   serif: '/fonts/PlayfairDisplay-Variable.ttf',
   handwriting: '/fonts/Caveat-Variable.ttf',
   chineseHandwriting: '/fonts/LXGWWenKaiLite-Regular.woff2',
+  chineseSerif: '/fonts/InvitationSong-Semibold.woff2',
 } as const;
 
 export type PosterFontRole = keyof typeof posterFontAssets;
 
 export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAssets, string>>) {
   return [
+    sources.chineseSerif
+      ? `@font-face{font-family:'Goods Island Song';src:url('${sources.chineseSerif}') format('woff2');font-weight:400 900;font-display:block}`
+      : '',
     sources.sans
       ? `@font-face{font-family:'Goods Island Sans';src:url('${sources.sans}') format('truetype');font-weight:200 1000;font-display:swap}`
       : '',
