@@ -13,6 +13,7 @@ import {
   getExportImage,
   mapWithConcurrency,
   posterFontCss,
+  preparePreviewFonts,
 } from '@/poster/assets';
 import { posterTemplateRegistry, posterTemplates } from '@/poster/registry';
 import type { PosterRenderOptions } from '@/poster/types';
@@ -95,36 +96,8 @@ export default function PosterEditor({
   const [items, setItems] = useState<PosterItemData[]>(initial.items);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
-  const [posterFontReady, setPosterFontReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    document.fonts
-      .load("400 32px 'Goods Island Chinese Hand'", '出一些心动收藏谷子名称价格')
-      .then(() => {
-        if (!cancelled) setPosterFontReady(true);
-      })
-      .catch(() => {
-        if (!cancelled) setPosterFontReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const activeTemplate = posterTemplateRegistry.get(template);
-    if (!activeTemplate) return;
-    const warmFonts = () => {
-      void posterFontCss(activeTemplate.exportFonts ?? ['sans']).catch(() => undefined);
-    };
-    if ('requestIdleCallback' in window) {
-      const idleId = window.requestIdleCallback(warmFonts, { timeout: 1200 });
-      return () => window.cancelIdleCallback(idleId);
-    }
-    const timeoutId = setTimeout(warmFonts, 250);
-    return () => clearTimeout(timeoutId);
-  }, [template]);
+  const [fontState, setFontState] = useState({ key: '', error: '' });
+  const [fontRetry, setFontRetry] = useState(0);
 
   const productMap = useMemo(
     () => new Map(data.products.map((product) => [product.id, product])),
@@ -159,6 +132,25 @@ export default function PosterEditor({
       return { svg: '', error: (error as Error).message };
     }
   }, [config, items, ratio, template, title, type, version]);
+
+  const fontText = rendered.svg.replace(/<[^>]*>/g, '');
+  const fontKey = template + '|' + fontText;
+  const posterFontReady = fontState.key === fontKey && !fontState.error;
+  useEffect(() => {
+    let cancelled = false;
+    const roles = posterTemplateRegistry.get(template)?.exportFonts ?? ['sans'];
+    preparePreviewFonts(roles, fontText)
+      .then(() => {
+        if (!cancelled) setFontState({ key: fontKey, error: '' });
+        void posterFontCss(roles, fontText).catch(() => undefined);
+      })
+      .catch(() => {
+        if (!cancelled) setFontState({ key: fontKey, error: '海报字体加载失败，请重试' });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [template, fontText, fontKey, fontRetry]);
 
   const exportData = useMemo<PosterData>(
     () => ({
@@ -313,7 +305,7 @@ export default function PosterEditor({
         return prepared.map((result) => result.item);
       });
       const fontStart = performance.now();
-      const fontsPromise = posterFontCss(exportFonts).then((value) => {
+      const fontsPromise = posterFontCss(exportFonts, fontText).then((value) => {
         timings.fontPrepare = performance.now() - fontStart;
         return value;
       });
@@ -522,10 +514,16 @@ export default function PosterEditor({
             <Save size={16} /> 保存到作品集
           </button>
         </section>
+        {fontState.key === fontKey && fontState.error && (
+          <button onClick={() => setFontRetry((value) => value + 1)}>重试加载字体</button>
+        )}
         <PosterPreview
-          key={posterFontReady ? 'poster-font-ready' : 'poster-font-loading'}
-          svg={rendered.svg}
-          error={rendered.error}
+          key={posterFontReady ? fontKey : 'poster-font-loading'}
+          svg={posterFontReady ? rendered.svg : ''}
+          error={
+            rendered.error ||
+            (fontState.key === fontKey && fontState.error ? fontState.error : '正在加载海报字体…')
+          }
           ratio={ratio}
           templateLabel={templates[template]?.label ?? '历史模板'}
           status={status}

@@ -9,3 +9,5 @@ Built with fontTools varLib.instancer (wght=600) and subset:
 U+0000-00FF, U+2000-206F, U+3000-30FF, U+3400-9FFF, U+FF00-FFEF.
 This preserves CJK unified ideographs, kana, common punctuation and Latin.
 The runtime family is Goods Island Song. Only Invitation requests this asset.
+
+Subset packages in invitation-song/ retain the same OFL license. Regenerate with scripts/build-poster-fonts.py and a decompressed TTF of InvitationSong-Semibold.woff2. Content hashes allow immutable caching.

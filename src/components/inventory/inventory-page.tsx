@@ -1,6 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo } from 'react';
+import { collectionInvestment } from '@/domain/collection-investment';
+import { fixed } from '@/domain/accounting';
 import { Flower2, Plus } from 'lucide-react';
 import CatalogBrowser from '../catalog-browser';
 import type { Product, Snapshot } from '../types';
@@ -28,6 +31,7 @@ export default function InventoryPage({
   onPurchase,
   onStatus,
 }: InventoryPageProps) {
+  const investment = useMemo(() => collectionInvestment(data), [data]);
   return (
     <>
       <div className="page-intro">
@@ -57,10 +61,10 @@ export default function InventoryPage({
           </strong>
         </Link>
         <Link href="/accounting" onClick={() => onStatus('')}>
-          <span>当前库存投入</span>
-          <strong>
-            {price(data.inventory.reduce((sum, item) => sum + Number(item.currentCost), 0))}
-          </strong>
+          <span>收藏投入</span>
+          <strong>{price(fixed(investment.total))}</strong>
+          <small>在手 {price(fixed(investment.inHand))}</small>
+          <small>待到货已付 {price(fixed(investment.pending))}</small>
         </Link>
       </div>
       {products.length ? (
@@ -77,11 +81,16 @@ export default function InventoryPage({
                 <>
                   <strong>{quantity ? `拥有 ×${quantity}` : '未拥有'}</strong>
                   {awaitingFor(product.id) > 0 && (
-                    <small>等待到货 ×{awaitingFor(product.id)}</small>
+                    <>
+                      <small>等待到货 ×{awaitingFor(product.id)}</small>
+                      <small>
+                        待到货已付 {price(fixed(investment.pendingByProduct.get(product.id) ?? 0n))}
+                      </small>
+                    </>
                   )}
                   <small>
-                    均价 {price(quantity ? costFor(product.id) / quantity : 0)} · 挂出{' '}
-                    {listingFor(product.id)} 件
+                    {quantity > 0 && <>在手均价 {price(costFor(product.id) / quantity)} · </>}
+                    挂出 {listingFor(product.id)} 件
                   </small>
                 </>
               ),

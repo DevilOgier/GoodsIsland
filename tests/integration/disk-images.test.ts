@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
+import { posterImage } from '../../src/infrastructure/poster-image';
 import { db } from '../../src/infrastructure/db';
 import { createUpload, completeUpload } from '../../src/domain/image-service';
 import { putObject, readObject } from '../../src/infrastructure/storage';
@@ -33,7 +34,12 @@ test('磁盘图片流程：上传凭证、原图、缩略图与数据库关联',
     assert.equal(intent.url, '/api/images/upload/' + intent.id);
     const pending = await db.uploadIntent.findUniqueOrThrow({ where: { id: intent.id } });
     const bytes = await sharp({
-      create: { width: 32, height: 32, channels: 4, background: '#abcdef' },
+      create: {
+        width: 32,
+        height: 32,
+        channels: 4,
+        background: { r: 171, g: 205, b: 239, alpha: 0.5 },
+      },
     })
       .png()
       .toBuffer();
@@ -47,6 +53,29 @@ test('磁盘图片流程：上传凭证、原图、缩略图与数据库关联',
     assert.ok(saved.original);
     assert.ok(saved.thumbnail);
     assert.deepEqual(await readObject(saved.original.objectKey), bytes);
+    const variant = await posterImage(saved.original.objectKey, 256);
+    const variantMeta = await sharp(variant).metadata();
+    assert.equal(variantMeta.format, 'webp');
+    assert.equal(variantMeta.width, 32, 'small originals must not be enlarged');
+    assert.equal(variantMeta.hasAlpha, true);
+    assert.strictEqual(await posterImage(saved.original.objectKey, 256), variant);
+    const largeKey = `original/${randomUUID()}`;
+    const large = await sharp({
+      create: {
+        width: 2000,
+        height: 1000,
+        channels: 4,
+        background: { r: 171, g: 205, b: 239, alpha: 0.5 },
+      },
+    })
+      .png()
+      .toBuffer();
+    await putObject(largeKey, large, 'image/png');
+    const resized = await sharp(await posterImage(largeKey, 512)).metadata();
+    assert.equal(resized.width, 512);
+    assert.equal(resized.height, 256);
+    assert.deepEqual(await readObject(largeKey), large, 'original remains unchanged');
+
     assert.equal(
       (await sharp(await readObject(saved.thumbnail.objectKey)).metadata()).format,
       'webp',

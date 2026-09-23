@@ -1,7 +1,9 @@
+import invitationSubsets from './invitation-font-subsets.json';
 export const fontRoles = {
   sans: "'Goods Island Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
   serif: "'Goods Island Serif', 'Noto Serif SC', 'Songti SC', 'SimSun', serif",
   handwriting: "'Goods Island Chinese Hand', 'Goods Island Hand', 'Kaiti SC', 'STKaiti', serif",
+  latinHandwriting: "'Goods Island Hand', cursive",
   mono: "'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
 } as const;
 
@@ -33,4 +35,30 @@ export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAsset
       ? `@font-face{font-family:'Goods Island Chinese Hand';src:url('${sources.chineseHandwriting}') format('woff2');font-weight:400;font-display:block}`
       : '',
   ].join('');
+}
+
+export const posterFontFamilies: Record<PosterFontRole, string> = {
+  sans: 'Goods Island Sans',
+  serif: 'Goods Island Serif',
+  handwriting: 'Goods Island Hand',
+  chineseHandwriting: 'Goods Island Chinese Hand',
+  chineseSerif: 'Goods Island Song',
+};
+
+export function posterFontSources(roles: PosterFontRole[], text?: string) {
+  const points =
+    text === undefined ? null : new Set(Array.from(text, (character) => character.codePointAt(0)!));
+  return [...new Set(roles)]
+    .sort()
+    .flatMap<{ role: PosterFontRole; url: string; unicodeRange: string }>((role) => {
+      if (role === 'chineseSerif' && points)
+        return invitationSubsets
+          .filter((part) => [...points].some((point) => point >= part.start && point <= part.end))
+          .map((part) => ({
+            role,
+            url: part.url,
+            unicodeRange: `U+${part.start.toString(16)}-${part.end.toString(16)}`,
+          }));
+      return [{ role, url: posterFontAssets[role], unicodeRange: '' }];
+    });
 }

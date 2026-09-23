@@ -171,7 +171,7 @@ export function renderInvitation(
       horizontal = !!b.horizontal;
     const small = b.h < height * 0.28;
     const padding = Math.min(20 * unit, b.w * 0.05, b.h * 0.05);
-    const infoH = Math.min(b.h * 0.37, 205 * unit);
+    const infoH = Math.min(b.h * (!horizontal && data.items.length >= 3 ? 0.47 : 0.37), 205 * unit);
     const hero = data.items.length === 1 && horizontal;
     const iw = horizontal ? b.w * (hero ? 0.6 : 0.38) : b.w - padding * 2;
     const ih = horizontal ? b.h - padding * 2 : b.h - infoH - padding * 2;
@@ -279,13 +279,13 @@ export function renderInvitation(
   body += text(width * 0.86, height * 0.16, 'Good things', {
     size: 25 * unit,
     fill: p.muted,
-    family: fontRoles.handwriting,
+    family: fontRoles.latinHandwriting,
     anchor: 'middle',
   });
   body += text(width * 0.86, height * 0.19, 'find a new home', {
     size: 21 * unit,
     fill: p.muted,
-    family: fontRoles.handwriting,
+    family: fontRoles.latinHandwriting,
     anchor: 'middle',
   });
   body += t(width / 2, height * 0.947, 'GOOD GOODS · SAME LOVE · A NEW STORY', 11 * unit, p.muted);

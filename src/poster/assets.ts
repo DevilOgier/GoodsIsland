@@ -1,9 +1,11 @@
 'use client';
 
-import { fontFaceCss, posterFontAssets, type PosterFontRole } from './fonts';
+import { posterImageSize } from './image-size';
+import { fontFaceCss, posterFontSources, posterFontFamilies, type PosterFontRole } from './fonts';
 
 const blobCache = new Map<string, Promise<Blob>>();
 const dataUrlCache = new Map<string, Promise<string>>();
+const loadedFonts = new Map<string, Promise<void>>();
 const fontCssCache = new Map<string, Promise<string>>();
 const exportImageCache = new Map<string, Promise<CachedExportImage>>();
 const posterExportCache = new Map<string, Blob>();
@@ -136,7 +138,8 @@ export async function getExportImage(
 
   const request = (async (): Promise<CachedExportImage> => {
     const downloadStart = performance.now();
-    const original = await fetchBlob(`/api/images/${id}`, '商品图片加载失败');
+    const size = posterImageSize(targetWidth, targetHeight);
+    const original = await fetchBlob(`/api/images/${id}?posterSize=${size}`, '商品图片加载失败');
     const imageDownload = performance.now() - downloadStart;
 
     const resizeStart = performance.now();
@@ -205,24 +208,51 @@ export function cachePosterExport(key: string, blob: Blob) {
   }
 }
 
-export function posterFontCss(roles: PosterFontRole[]) {
-  const uniqueRoles = [...new Set(roles)].sort();
-  const key = uniqueRoles.join('|');
+export function posterFontCss(roles: PosterFontRole[], text?: string) {
+  const sources = posterFontSources(roles, text);
+  const key = sources.map((source) => source.url).join('|');
   const cached = fontCssCache.get(key);
   if (cached) return cached;
   const request = Promise.all(
-    uniqueRoles.map(
-      async (role) =>
-        [role, await blobData(posterFontAssets[role], '海报字体加载失败')] as const,
-    ),
+    sources.map(async ({ role, url, unicodeRange }) => {
+      const dataUrl = await blobData(url, '海报字体加载失败，请重试');
+      const css = fontFaceCss({ [role]: dataUrl });
+      return unicodeRange
+        ? css.replace('font-display:block', `font-display:swap;unicode-range:${unicodeRange}`)
+        : css;
+    }),
   )
-    .then((entries) => fontFaceCss(Object.fromEntries(entries)))
+    .then((rules) => rules.join(''))
     .catch((error) => {
       fontCssCache.delete(key);
       throw error;
     });
   fontCssCache.set(key, request);
   return request;
+}
+
+export async function preparePreviewFonts(roles: PosterFontRole[], text: string) {
+  await Promise.all(
+    posterFontSources(roles, text).map(({ role, url, unicodeRange }) => {
+      const cached = loadedFonts.get(url);
+      if (cached) return cached;
+      const request = fetchBlob(url, '海报字体加载失败，请重试')
+        .then(async (blob) => {
+          const face = new FontFace(posterFontFamilies[role], await blob.arrayBuffer(), {
+            weight: role === 'chineseHandwriting' ? '400' : '400 900',
+            ...(unicodeRange ? { unicodeRange } : {}),
+          });
+          await face.load();
+          document.fonts.add(face);
+        })
+        .catch((error) => {
+          loadedFonts.delete(url);
+          throw error;
+        });
+      loadedFonts.set(url, request);
+      return request;
+    }),
+  );
 }
 
 export function embedPosterFonts(svg: string, css: string) {
