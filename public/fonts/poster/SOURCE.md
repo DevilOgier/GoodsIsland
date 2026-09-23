@@ -1,0 +1,1 @@
+WOFF2 conversions of the existing Nunito Sans, Playfair Display and Caveat variable TTF assets. Glyphs and weights are unchanged. Sources and SIL OFL licenses remain in the parent fonts directory (OFL-NunitoSans.txt, OFL-PlayfairDisplay.txt, OFL-Caveat.txt). Generated with fontTools TTFont, flavor=woff2; filenames include SHA-256 prefixes for immutable HTTP caching.

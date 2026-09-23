@@ -14,6 +14,7 @@ export const invitationTemplate: PosterTemplate = {
     numeric: fontRoles.serif,
     handwriting: fontRoles.serif,
   },
+  previewFonts: ['serif', 'chineseSerif', 'handwriting'],
   exportFonts: ['serif', 'chineseSerif', 'handwriting'],
   palettes: [
     {

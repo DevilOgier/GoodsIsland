@@ -244,18 +244,13 @@ function renderCard(
     output += `<path d="M${padding} ${tradeY + 7} Q${(padding + underlineRight) / 2} ${tradeY + 1} ${underlineRight} ${tradeY + 7}" fill="none" stroke="${palette.secondary}" stroke-width="${clamp(3, amountSize * 0.13, 7)}" stroke-linecap="round" opacity=".75"/>`;
   }
   output += `<g data-quantity-label="${quantityText}" data-quantity-left="${quantityLeft}" data-quantity-right="${quantityRight}" data-quantity-width="${quantityWidth}" data-price-right="${priceRight}" data-safe-right="${safeRight}" data-card-width="${width}"><path d="M${quantityLeft - 5} ${tradeY - titleSize * 0.95} L${quantityRight + 3} ${tradeY - titleSize * 1.05} L${quantityRight - 2} ${tradeY + 8} L${quantityLeft} ${tradeY + 4}Z" fill="${palette.primary}" opacity=".82"/>`;
-  output += text(
-    quantityLeft + quantityWidth / 2,
-    tradeY - titleSize * 0.08,
-    quantityText,
-    {
-      size: quantitySize,
-      fill: '#fffdf8',
-      family: fontRoles.handwriting,
-      weight: 700,
-      anchor: 'middle',
-    },
-  );
+  output += text(quantityLeft + quantityWidth / 2, tradeY - titleSize * 0.08, quantityText, {
+    size: quantitySize,
+    fill: '#fffdf8',
+    family: fontRoles.handwriting,
+    weight: 700,
+    anchor: 'middle',
+  });
   output += '</g>';
   if (hasNote && height - tradeY > 35)
     output += text(padding, height - padding * 0.65, note, {
@@ -286,6 +281,7 @@ export const polaroidTemplate: PosterTemplate = {
     numeric: fontRoles.handwriting,
     handwriting: fontRoles.handwriting,
   },
+  previewFonts: ['chineseHandwriting', 'sans'],
   exportFonts: ['chineseHandwriting', 'sans'],
   palettes: [
     {

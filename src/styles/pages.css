@@ -786,34 +786,6 @@
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
   }
 }
-@font-face {
-  font-family: 'Goods Island Sans';
-  src: url('/fonts/NunitoSans-Variable.ttf') format('truetype');
-  font-weight: 200 1000;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Goods Island Serif';
-  src: url('/fonts/PlayfairDisplay-Variable.ttf') format('truetype');
-  font-weight: 400 900;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Goods Island Hand';
-  src: url('/fonts/Caveat-Variable.ttf') format('truetype');
-  font-weight: 400 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Goods Island Chinese Hand';
-  src: url('/fonts/LXGWWenKaiLite-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: block;
-}
-
 .poster-preview__svg {
   width: 100%;
   max-height: 680px;

@@ -1,0 +1,1 @@
+Unicode subsets of the existing LXGWWenKaiLite-Regular font. Same glyphs, SIL OFL 1.1 license; see ../OFL-LXGWWenKai.txt. Regenerate using scripts/build-poster-fonts.py with the decompressed original TTF, poster-wenkai and src/poster/wenkai-font-subsets.json arguments. Filenames include SHA-256 prefixes for immutable HTTP caching.

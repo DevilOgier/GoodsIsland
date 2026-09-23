@@ -1,3 +1,5 @@
+import wenkaiSubsets from './wenkai-font-subsets.json';
+import latinAssets from './latin-font-assets.json';
 import invitationSubsets from './invitation-font-subsets.json';
 export const fontRoles = {
   sans: "'Goods Island Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
@@ -8,9 +10,9 @@ export const fontRoles = {
 } as const;
 
 export const posterFontAssets = {
-  sans: '/fonts/NunitoSans-Variable.ttf',
-  serif: '/fonts/PlayfairDisplay-Variable.ttf',
-  handwriting: '/fonts/Caveat-Variable.ttf',
+  sans: latinAssets.sans,
+  serif: latinAssets.serif,
+  handwriting: latinAssets.handwriting,
   chineseHandwriting: '/fonts/LXGWWenKaiLite-Regular.woff2',
   chineseSerif: '/fonts/InvitationSong-Semibold.woff2',
 } as const;
@@ -23,13 +25,13 @@ export function fontFaceCss(sources: Partial<Record<keyof typeof posterFontAsset
       ? `@font-face{font-family:'Goods Island Song';src:url('${sources.chineseSerif}') format('woff2');font-weight:400 900;font-display:block}`
       : '',
     sources.sans
-      ? `@font-face{font-family:'Goods Island Sans';src:url('${sources.sans}') format('truetype');font-weight:200 1000;font-display:swap}`
+      ? `@font-face{font-family:'Goods Island Sans';src:url('${sources.sans}') format('woff2');font-weight:200 1000;font-display:swap}`
       : '',
     sources.serif
-      ? `@font-face{font-family:'Goods Island Serif';src:url('${sources.serif}') format('truetype');font-weight:400 900;font-display:swap}`
+      ? `@font-face{font-family:'Goods Island Serif';src:url('${sources.serif}') format('woff2');font-weight:400 900;font-display:swap}`
       : '',
     sources.handwriting
-      ? `@font-face{font-family:'Goods Island Hand';src:url('${sources.handwriting}') format('truetype');font-weight:400 700;font-display:swap}`
+      ? `@font-face{font-family:'Goods Island Hand';src:url('${sources.handwriting}') format('woff2');font-weight:400 700;font-display:swap}`
       : '',
     sources.chineseHandwriting
       ? `@font-face{font-family:'Goods Island Chinese Hand';src:url('${sources.chineseHandwriting}') format('woff2');font-weight:400;font-display:block}`
@@ -51,8 +53,8 @@ export function posterFontSources(roles: PosterFontRole[], text?: string) {
   return [...new Set(roles)]
     .sort()
     .flatMap<{ role: PosterFontRole; url: string; unicodeRange: string }>((role) => {
-      if (role === 'chineseSerif' && points)
-        return invitationSubsets
+      if ((role === 'chineseSerif' || role === 'chineseHandwriting') && points)
+        return (role === 'chineseSerif' ? invitationSubsets : wenkaiSubsets)
           .filter((part) => [...points].some((point) => point >= part.start && point <= part.end))
           .map((part) => ({
             role,

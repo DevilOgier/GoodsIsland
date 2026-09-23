@@ -34,3 +34,18 @@ test('导出图片按占位两倍像素向上选档，不降低到缩略图清�
   assert.equal(posterImageSize(1200, 900), 1536);
   assert.equal(posterImageSize(2400, 2400), 2048);
 });
+
+test('默认手账预览只请求分包文楷和 WOFF2 西文，不加载宋体或完整中文字库', () => {
+  const sources = posterFontSources(
+    ['chineseHandwriting', 'sans'],
+    '出一些心动收藏谷子名称欢迎询价',
+  );
+  assert.ok(sources.length > 1);
+  assert.ok(sources.every((source) => source.url.endsWith('.woff2')));
+  assert.ok(
+    sources.every(
+      (source) =>
+        !source.url.includes('invitation-song') && !source.url.includes('Lite-Regular.woff2'),
+    ),
+  );
+});

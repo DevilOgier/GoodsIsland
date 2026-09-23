@@ -13,8 +13,8 @@ import {
   getExportImage,
   mapWithConcurrency,
   posterFontCss,
-  preparePreviewFonts,
 } from '@/poster/assets';
+import { preparePreviewFonts } from '@/poster/preview-fonts';
 import { posterTemplateRegistry, posterTemplates } from '@/poster/registry';
 import type { PosterRenderOptions } from '@/poster/types';
 import { resolveOptions } from '@/poster/utils';
@@ -138,14 +138,15 @@ export default function PosterEditor({
   const posterFontReady = fontState.key === fontKey && !fontState.error;
   useEffect(() => {
     let cancelled = false;
-    const roles = posterTemplateRegistry.get(template)?.exportFonts ?? ['sans'];
-    preparePreviewFonts(roles, fontText)
+    const roles = posterTemplateRegistry.get(template)?.previewFonts ?? ['sans'];
+    preparePreviewFonts(roles, fontText, template, () => {
+      if (!cancelled) setFontState({ key: fontKey, error: '' });
+    })
       .then(() => {
         if (!cancelled) setFontState({ key: fontKey, error: '' });
-        void posterFontCss(roles, fontText).catch(() => undefined);
       })
-      .catch(() => {
-        if (!cancelled) setFontState({ key: fontKey, error: '海报字体加载失败，请重试' });
+      .catch((error: Error) => {
+        if (!cancelled) setFontState({ key: fontKey, error: error.message });
       });
     return () => {
       cancelled = true;
@@ -305,7 +306,7 @@ export default function PosterEditor({
         return prepared.map((result) => result.item);
       });
       const fontStart = performance.now();
-      const fontsPromise = posterFontCss(exportFonts, fontText).then((value) => {
+      const fontsPromise = posterFontCss(exportFonts, fontText, template).then((value) => {
         timings.fontPrepare = performance.now() - fontStart;
         return value;
       });
@@ -519,14 +520,18 @@ export default function PosterEditor({
         )}
         <PosterPreview
           key={posterFontReady ? fontKey : 'poster-font-loading'}
-          svg={posterFontReady ? rendered.svg : ''}
-          error={
-            rendered.error ||
-            (fontState.key === fontKey && fontState.error ? fontState.error : '正在加载海报字体…')
-          }
+          svg={rendered.svg}
+          error={rendered.error}
           ratio={ratio}
           templateLabel={templates[template]?.label ?? '历史模板'}
-          status={status}
+          status={
+            status ||
+            (!posterFontReady && fontText
+              ? fontState.key === fontKey && fontState.error
+                ? fontState.error
+                : '字体正在后台加载，可以继续编辑。'
+              : '')
+          }
         >
           <button
             className="primary"

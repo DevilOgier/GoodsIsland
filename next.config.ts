@@ -6,7 +6,7 @@ const config: NextConfig = {
   async headers() {
     return [
       {
-        source: '/fonts/invitation-song/:path*',
+        source: '/fonts/:family(invitation-song|poster-wenkai|poster)/:path*',
         headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
       },
     ];

@@ -23,6 +23,7 @@ export const ginghamTemplate: PosterTemplate = {
     numeric: fontRoles.sans,
     handwriting: fontRoles.handwriting,
   },
+  previewFonts: ['serif', 'sans'],
   exportFonts: ['serif', 'sans'],
   palettes: [
     {

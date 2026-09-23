@@ -56,6 +56,7 @@ export type PosterTemplate = {
   description: string;
   palettes: PosterPalette[];
   typography: PosterTypography;
+  previewFonts?: import('./fonts').PosterFontRole[];
   exportFonts?: import('./fonts').PosterFontRole[];
   defaultOptions: PosterRenderOptions;
   recommendedItems: string;
