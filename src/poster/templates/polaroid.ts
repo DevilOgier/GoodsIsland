@@ -138,7 +138,64 @@ function scrapbookDefs(palette: PosterPalette) {
 }
 
 function background(width: number, height: number, palette: PosterPalette) {
-  return `<rect width="100%" height="100%" fill="url(#paper-fibres)"/><path d="M-35 ${height * 0.2} L${width * 0.43} ${height * 0.15} L${width * 0.47} ${height * 0.88} L-20 ${height * 0.92}Z" fill="${palette.primary}" opacity=".13"/><path d="M${width * 0.04} ${height * 0.3} L${width * 0.48} ${height * 0.27} L${width * 0.46} ${height * 0.72} L${width * 0.08} ${height * 0.76}Z" fill="url(#gingham)" transform="rotate(2 ${width * 0.25} ${height * 0.5})"/><path d="M${width * 0.62} ${height * 0.22}H${width * 1.02}V${height * 0.87}H${width * 0.57}Z" fill="${palette.surface}" opacity=".42"/><g stroke="${palette.primary}" opacity=".14">${Array.from({ length: 12 }, (_, index) => `<path d="M${width * 0.59} ${height * (0.31 + index * 0.045)}H${width}"/>`).join('')}</g>`;
+  const p = palette;
+  const daisy = (x: number, y: number, s: number, angle = 0) =>
+    `<g transform="translate(${x} ${y}) rotate(${angle}) scale(${s})">${Array.from({ length: 8 }, (_, i) => `<ellipse cy="-12" rx="5.7" ry="11" fill="${p.surface}" stroke="#d9cbb2" stroke-width=".6" transform="rotate(${i * 45})"/>`).join('')}<circle r="6" fill="#c7aa73"/><circle cx="-1" cy="-1" r="3.5" fill="#e9d293"/></g>`;
+  const sprig = (x: number, y: number, s: number, angle: number) =>
+    `<g transform="translate(${x} ${y}) rotate(${angle}) scale(${s})" stroke="${p.primary}" stroke-width="2.3" stroke-linecap="round"><path d="M0 130Q8 50 45-25M12 78L-15 30M27 32L60 10" fill="none"/><g fill="${p.primary}" stroke-width="1"><path d="M9 90Q-28 85-24 57Q0 59 9 90Z"/><path d="M17 61Q47 67 57 38Q33 33 17 61Z"/><path d="M29 28Q1 20 8-6Q32 0 29 28Z"/><path d="M39 1Q61 4 68-20Q46-21 39 1Z"/></g><g stroke="${p.surface}" opacity=".35" stroke-width="1"><path d="M9 90L-20 61M17 61L52 42M29 28L12-2M39 1L63-17"/></g></g>`;
+  const holes = Array.from(
+    { length: 17 },
+    (_, i) => `<circle cx="${250 + i * 33}" cy="1017" r="4.4" fill="${p.primary}" opacity=".24"/>`,
+  ).join('');
+  const ruled = Array.from({ length: 23 }, (_, i) => `<path d="M-15 ${35 + i * 31}H570"/>`).join(
+    '',
+  );
+  return `<defs>
+    <pattern id="lab-paper-grain" width="19" height="23" patternUnits="userSpaceOnUse"><path d="M0 4h8m4 11h7M3 21h6" stroke="#8d7963" stroke-width=".65" opacity=".17"/><circle cx="14" cy="6" r=".7" fill="#88755f" opacity=".15"/></pattern>
+    <pattern id="lab-grid" width="38" height="38" patternUnits="userSpaceOnUse"><rect width="38" height="38" fill="#f0e7d1"/><rect width="19" height="38" fill="${p.primary}" opacity=".27"/><rect width="38" height="19" fill="${p.primary}" opacity=".27"/></pattern>
+    <pattern id="lab-stitch" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M0 0H24V24" fill="none" stroke="${p.primary}" stroke-width=".65" opacity=".17"/></pattern>
+  </defs>
+  <g data-background="paper-garden-v1" transform="scale(${width / 1080} ${height / 1080})">
+  <rect width="1080" height="1080" fill="url(#lab-stitch)"/>
+  <path d="M-20 74L47 62 99 78 145 65 202 72 249 53 316 66 359 52 402 69 465 56 526 80 555 265 537 382 557 509 539 640 557 774 534 876 551 985 494 1001 432 986 366 1009 303 989 248 1005 183 991 119 1014 64 1002-20 1017Z" fill="${p.primary}" opacity=".39"/>
+  <path d="M-20 94L50 78 104 94 153 83 209 88 252 70 318 83 365 69 410 86 468 73 528 96" fill="none" stroke="${p.surface}" stroke-width="3" opacity=".7"/>
+  <path d="M-20 923L99 941 196 917 299 938 397 920 495 940 583 921 677 944 755 931 848 952 942 928 1110 956V1100H-20Z" fill="${p.primary}" opacity=".32"/>
+  <g transform="translate(63 160) rotate(-5)">
+    <path d="M0 9L399 0 409 676 390 690 6 679Z" fill="url(#lab-grid)"/>
+    <path d="M2 15L398 5M9 671L389 682" stroke="${p.surface}" stroke-width="2" opacity=".6"/>
+  </g>
+  <g transform="translate(633 166) rotate(4)">
+    <path d="M0 0L63 4 115 0 176 6 235 1 290 7 355 0 410 4 465 0 554 8 550 801 487 810 422 802 357 815 288 805 221 813 161 803 93 816 20 807-7 787Z" fill="#f8f0e0"/>
+    <g stroke="#94a58e" stroke-width="1" opacity=".32">${ruled}</g>
+    <path d="M30 0V805" stroke="${p.secondary}" stroke-width="2" opacity=".5"/>
+  </g>
+  <path d="M874-20L1100-20V277L1061 269 1020 284 989 274 951 286 923 275 891 283Z" fill="${p.secondary}" opacity=".47"/>
+  <path d="M803 950L863 934 924 946 981 928 1049 936 1100 923V1100H791Z" fill="${p.secondary}" opacity=".57"/>
+  <path d="M243 1001H825V1035H243Z" fill="${p.surface}" opacity=".85"/>${holes}
+  <path d="M240 1035Q254 1061 268 1035Q282 1061 296 1035Q310 1061 324 1035Q338 1061 352 1035Q366 1061 380 1035Q394 1061 408 1035Q422 1061 436 1035Q450 1061 464 1035Q478 1061 492 1035Q506 1061 520 1035Q534 1061 548 1035Q562 1061 576 1035Q590 1061 604 1035Q618 1061 632 1035Q646 1061 660 1035Q674 1061 688 1035Q702 1061 716 1035Q730 1061 744 1035Q758 1061 772 1035Q786 1061 800 1035Q814 1061 828 1035" fill="${p.surface}" opacity=".85"/>
+  <g transform="translate(53 28) rotate(-10)">
+    <path d="M0 5L121 0 128 111 6 117Z" fill="${p.surface}"/>
+    <path d="M8 13L113 8 119 103 14 108Z" fill="none" stroke="#b7aa8c" stroke-dasharray="3 3"/>
+    ${text(64, 40, 'LITTLE', { size: 13, fill: p.primary, family: fontRoles.handwriting, anchor: 'middle', letterSpacing: 2 })}
+    ${text(64, 62, 'TREASURES', { size: 12, fill: p.primary, family: fontRoles.handwriting, anchor: 'middle', letterSpacing: 1 })}
+    <path d="M54 84C40 75 48 63 55 73C66 63 73 77 54 84Z" fill="${p.secondary}"/>
+    <rect x="35" y="-8" width="52" height="21" fill="${p.secondary}" opacity=".65"/>
+  </g>
+  <g transform="translate(925 74) rotate(9)">
+    <path d="M0 0H93V135H0Z" fill="${p.surface}" stroke="#b7aa8c" stroke-dasharray="3 4"/>
+    <rect x="8" y="8" width="77" height="119" fill="${p.secondary}" opacity=".19"/>
+    ${text(46, 39, 'FOR YOU', { size: 12, fill: p.primary, family: fontRoles.handwriting, anchor: 'middle', letterSpacing: 1 })}
+    <path d="M45 78C-2 26 4 113 45 78C90 25 91 113 45 78M45 78L33 112M45 78L62 112" fill="none" stroke="${p.primary}" stroke-width="2"/>
+  </g>
+  <path d="M390 1056C460 1011 572 1086 686 1034S845 1002 872 1028" fill="none" stroke="${p.primary}" stroke-width="16" opacity=".56"/>
+  <path d="M390 1051C460 1006 572 1081 686 1029S845 997 872 1023" fill="none" stroke="${p.surface}" stroke-width="2" opacity=".5"/>
+  ${sprig(27, 935, 1.15, -17)}${sprig(1018, 898, 1.1, 24)}
+  ${sprig(11, 77, 0.8, 5)}${sprig(1035, 29, 0.85, 70)}
+  ${daisy(30, 975, 1.2, -12)}${daisy(75, 1011, 0.85, 12)}${daisy(20, 1031, 0.7)}
+  ${daisy(1009, 1012, 1.15, 8)}${daisy(1054, 985, 0.75)}${daisy(1050, 1045, 0.65)}
+  ${daisy(1041, 33, 1.05)}${daisy(996, 16, 0.65, 18)}${daisy(13, 48, 0.75)}
+  <rect width="1080" height="1080" fill="url(#lab-paper-grain)" pointer-events="none"/>
+  </g>`;
 }
 
 function ornaments(width: number, height: number, palette: PosterPalette, count: number) {
