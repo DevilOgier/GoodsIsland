@@ -76,6 +76,7 @@ export function posterImageTargets(data: PosterData): Map<string, PosterImageTar
     items: data.items.map((item) => ({ ...item, image: transparentProbeImage })),
   });
   const targets = new Map<string, PosterImageTarget>();
+  const layoutScale = Number(probeSvg.match(/data-layout-scale="([\d.]+)"/)?.[1] ?? 1);
   for (const match of probeSvg.matchAll(/<image\b[^>]*data-poster-product-id="([^"]+)"[^>]*>/g)) {
     const tag = match[0];
     const width = Number(tag.match(/\bwidth="([\d.]+)"/)?.[1]);
@@ -85,8 +86,8 @@ export function posterImageTargets(data: PosterData): Map<string, PosterImageTar
     const current = targets.get(productId);
     targets.set(productId, {
       productId,
-      displayWidth: Math.max(current?.displayWidth ?? 0, width),
-      displayHeight: Math.max(current?.displayHeight ?? 0, height),
+      displayWidth: Math.max(current?.displayWidth ?? 0, width * layoutScale),
+      displayHeight: Math.max(current?.displayHeight ?? 0, height * layoutScale),
     });
   }
   for (const item of data.items) {
