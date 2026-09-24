@@ -171,7 +171,11 @@ export function renderInvitation(
       horizontal = !!b.horizontal;
     const small = b.h < height * 0.28;
     const padding = Math.min(20 * unit, b.w * 0.05, b.h * 0.05);
-    const infoH = Math.min(b.h * (!horizontal && data.items.length >= 3 ? 0.47 : 0.37), 205 * unit);
+    const noteReserve =
+      options.showNote && item.note && !small && data.items.length >= 3 ? 38 * unit : 0;
+    const infoH =
+      Math.min(b.h * (!horizontal && data.items.length >= 3 ? 0.47 : 0.37), 205 * unit) +
+      noteReserve;
     const hero = data.items.length === 1 && horizontal;
     const iw = horizontal ? b.w * (hero ? 0.6 : 0.38) : b.w - padding * 2;
     const ih = horizontal ? b.h - padding * 2 : b.h - infoH - padding * 2;
@@ -182,7 +186,7 @@ export function renderInvitation(
     const ty = horizontal ? b.y + b.h * (hero ? 0.36 : 0.16) : iy + ih + padding;
     const title = Math.min(horizontal ? 25 : 28, tw / (horizontal ? 9 : 13)) * unit;
     const size = Math.max(9, Math.min(title, b.h * 0.1));
-    const line = size * 1.35;
+    const line = size * 1.6;
     const lines = wrapText(item.name, tw / size, 2);
     body += '<g data-layout="invitation-entry" data-item-index="' + i + '">';
     if (horizontal) {
@@ -228,13 +232,55 @@ export function renderInvitation(
     const clipId = 'invitation-image-' + i;
     body += '<clipPath id="' + clipId + '"><path d="' + arch(ix, iy, iw, ih) + '"/></clipPath>';
     body += image(item, ix, iy, iw, ih, p.background, { clipId });
+    // Compact entries use one explicit value row instead of stacking tiny field labels.
+    // Reserve two name lines even for short names so all values share the same baseline.
+    if (horizontal && b.h < 150 * unit) {
+      const nameSize = Math.min(18 * unit, b.h * 0.17, tw / 11);
+      const nameTop = b.y + padding + nameSize;
+      const nameLine = nameSize * 1.6;
+      wrapText(item.name, tw / nameSize, 2).forEach((value, j) => {
+        body += t(tx, nameTop + j * nameLine, value, nameSize, p.text, 'start');
+      });
+      const valueY = b.y + b.h - padding - 5 * unit;
+      const quantity = '×' + item.quantity;
+      const valueSize = Math.min(24 * unit, b.h * 0.23);
+      body += '<g data-field="quantity">';
+      body += t(
+        tx,
+        valueY,
+        quantity,
+        Math.min(valueSize, (tw * 0.3) / visualLength(quantity)),
+        p.text,
+        'start',
+      );
+      body += '</g>';
+      if (options.priceStyle !== 'PRICE_HIDDEN') {
+        const value = item.price
+          ? (wanted ? '心理价 ¥' : '¥') + item.price
+          : wanted
+            ? '欢迎带价'
+            : '欢迎询价';
+        body += '<g data-field="price">';
+        body += t(
+          tx + tw,
+          valueY,
+          value,
+          Math.min(valueSize, (tw * 0.64) / visualLength(value)),
+          p.price,
+          'end',
+        );
+        body += '</g>';
+      }
+      body += '</g>';
+      return;
+    }
     lines.forEach((value, j) => {
       body += t(tx + tw / 2, ty + size + j * line, value, size);
     });
     const ruleY = ty + size + (lines.length - 1) * line + Math.max(8, size * 0.6);
     body += '<path d="M' + tx + ' ' + ruleY + 'H' + (tx + tw) + '" stroke="' + p.secondary + '"/>';
     const labelSize = Math.max(7, Math.min(11 * unit, tw * 0.035));
-    const priceY = ruleY + labelSize + Math.min(40 * unit, b.h * 0.13);
+    const priceY = ruleY + labelSize + 6 * unit + Math.min(42 * unit, b.h * 0.15) + 8 * unit;
     body += t(tx + tw * 0.23, ruleY + labelSize + 6 * unit, 'QUANTITY', labelSize, p.muted);
     body += t(
       tx + tw * 0.23,

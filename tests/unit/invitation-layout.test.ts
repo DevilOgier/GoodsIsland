@@ -49,3 +49,43 @@ test('请柬双拱使用高清大图占位并保留收出物字段和转义', ()
   const hidden = renderPoster({ ...data, config: { priceStyle: 'PRICE_HIDDEN', showNote: false } });
   assert.doesNotMatch(hidden, /123456\.78|备注/);
 });
+
+test('密集请柬的字段标签与数值有独立行距，数量和心理价保留', () => {
+  for (const ratio of Object.keys(ratios)) {
+    for (const count of [4, 6, 8, 10, 12]) {
+      const items = Array.from({ length: count }, (_, i) => ({
+        productId: String(i),
+        name: '三角初华 · Wego主唱系列 · 徽章',
+        quantity: 100,
+        price: '35',
+        note: '备注',
+      }));
+      const svg = renderPoster({
+        title: '收物',
+        type: 'WANTED',
+        template: 'invitation',
+        ratio,
+        items,
+      });
+      const texts = [...svg.matchAll(/<text\b([^>]*)>([^<]*)<\/text>/g)].map((m) => ({
+        value: m[2],
+        y: Number(m[1].match(/\by="([^"]+)"/)?.[1]),
+        size: Number(m[1].match(/font-size="([^"]+)"/)?.[1]),
+      }));
+      for (let i = 0; i < texts.length; i++) {
+        if (texts[i].value !== 'QUANTITY' && texts[i].value !== '心理价 / BUDGET') continue;
+        const label = texts[i],
+          value = texts[i + 1];
+        assert.ok(
+          value.y - value.size > label.y + label.size * 0.25,
+          ratio + ' / ' + count + '：字段标签不可与数值重叠',
+        );
+      }
+      assert.equal(texts.filter((t) => t.value === '100' || t.value === '×100').length, count);
+      assert.equal(
+        texts.filter((t) => t.value === '¥35' || t.value === '心理价 ¥35').length,
+        count,
+      );
+    }
+  }
+});
