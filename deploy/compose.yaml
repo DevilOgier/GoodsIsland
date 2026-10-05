@@ -21,6 +21,7 @@ services:
       WEB_HOST: 0.0.0.0
       PORT: 3000
       LOCAL_SERVICES: 'false'
+      CATALOG_EXPORT_DIR: /app/data/objects/catalog-jobs
     restart: unless-stopped
     ports: ['127.0.0.1:3000:3000']
     depends_on:
@@ -39,11 +40,12 @@ services:
       retries: 12
   worker:
     image: ${APP_IMAGE:?Set APP_IMAGE}
-    command: [node, --import, tsx, src/workers/image-worker.ts]
+    command: [node, scripts/workers.mjs]
     env_file: .env
     volumes: [image-data:/app/data/objects]
     environment:
       LOCAL_SERVICES: 'false'
+      CATALOG_EXPORT_DIR: /app/data/objects/catalog-jobs
     restart: unless-stopped
     depends_on:
       db: { condition: service_healthy }

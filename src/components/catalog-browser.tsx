@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Boxes, ChevronLeft, Layers3, PackageOpen, Shapes } from 'lucide-react';
 import CollectionGallery, { type GalleryItem } from './collection-gallery';
 import ProductArt from './product-art';
+import CatalogExport from './catalog/catalog-export';
 import { SeriesCollage } from './product-picker';
 import { compareProductsByReleaseDate } from '@/lib/product-order';
 
@@ -27,7 +28,8 @@ export default function CatalogBrowser({
   const [selected, setSelected] = useState('');
   const [page, setPage] = useState(1);
   const orderedItems = useMemo(
-    () => [...items].sort((left, right) => compareProductsByReleaseDate(left.product, right.product)),
+    () =>
+      [...items].sort((left, right) => compareProductsByReleaseDate(left.product, right.product)),
     [items],
   );
   const groups = useMemo(() => {
@@ -105,6 +107,12 @@ export default function CatalogBrowser({
           </button>
         ))}
       </div>
+      {!inventory && (
+        <CatalogExport
+          products={visible.map((item) => item.product)}
+          initialType={granularity === 'type' ? chosen?.key : undefined}
+        />
+      )}
       {granularity === 'all' || chosen ? (
         <>
           {chosen && (

@@ -1,0 +1,88 @@
+.trigger {
+  display: flex;
+  justify-content: flex-end;
+  margin: 12px 0;
+}
+.panel {
+  width: min(900px, 100vw);
+  max-width: 100vw;
+}
+.content {
+  padding: 20px;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.fields label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 14px;
+}
+.fields select,
+.fields input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+}
+.title {
+  grid-column: 1/-1;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.check input {
+  width: 18px;
+  height: 18px;
+}
+.preview {
+  background: white;
+  border: 1px solid var(--color-line, #e9e9e1);
+  overflow: hidden;
+  border-radius: 12px;
+}
+.preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.actions button {
+  min-height: 44px;
+}
+.hint {
+  color: var(--color-text-muted, #777);
+  font-size: 13px;
+  margin: 0;
+}
+.result {
+  display: grid;
+  gap: 8px;
+}
+.result a {
+  padding: 12px;
+  text-align: center;
+  border: 1px solid #e9e9e1;
+  border-radius: 10px;
+}
+@media (max-width: 600px) {
+  .content {
+    padding: 12px;
+  }
+  .fields {
+    grid-template-columns: 1fr;
+  }
+}
